@@ -273,81 +273,108 @@ fun NoteExplorerSidebar(
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
             if (notes.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        Text("Workspace is clean.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.BorderColor, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                            }
+                            Text("No notes yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Tap + to create your first note", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             } else {
                 items(notes) { note ->
                     val course = courses.find { it.id == note.courseId }
                     val isSelected = note.id == activeNoteId
+                    val courseColor = course?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) }
+                        ?: MaterialTheme.colorScheme.primary
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelectNote(note.id) }
                             .border(
-                                width = 1.dp,
+                                width = if (isSelected) 1.5.dp else 0.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                 shape = RoundedCornerShape(12.dp)
                             ),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = note.title,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(
-                                    onClick = { noteToDelete = note },
-                                    modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete note",
-                                        tint = Color.Red.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(18.dp)
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            // Left color accent bar
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .fillMaxHeight()
+                                    .background(
+                                        courseColor,
+                                        RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
                                     )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = if (note.textContent.isNotEmpty()) note.textContent else "Draw handwriting using stylus/S-Pen",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                    .defaultMinSize(minHeight = 72.dp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = note.getRelativeTime(),
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                                if (course != null) {
-                                    val courseColor = Color(android.graphics.Color.parseColor(course.colorHex))
-                                    Box(
-                                        modifier = Modifier
-                                            .background(courseColor, RoundedCornerShape(6.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = note.title,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { noteToDelete = note },
+                                        modifier = Modifier.size(32.dp)
                                     ) {
-                                        Text(course.code, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete note",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = if (note.textContent.isNotEmpty()) note.textContent else "S-Pen canvas drawing",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = note.getRelativeTime(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        if (note.isSynced) {
+                                            Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = Color(0xFF4CAF50), modifier = Modifier.size(14.dp))
+                                        }
+                                        if (course != null) {
+                                            Surface(shape = RoundedCornerShape(5.dp), color = courseColor.copy(alpha = 0.15f)) {
+                                                Text(course.code, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), color = courseColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1237,15 +1264,61 @@ fun ActiveNoteEditor(
 @Composable
 fun EmptyWorkspaceState(onCreateNote: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.EditCalendar, contentDescription = null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Open a study note, or draft a blank workspace.", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = onCreateNote) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Create Note")
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            // Layered icon illustration
+            Box(contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(
+                            androidx.compose.ui.graphics.Brush.radialGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f)
+                                )
+                            ),
+                            androidx.compose.foundation.shape.CircleShape
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.EditCalendar,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Select a note to begin",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "Choose from the sidebar or create a new workspace",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+            Button(
+                onClick = onCreateNote,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Create New Note", fontWeight = FontWeight.SemiBold)
             }
         }
     }
