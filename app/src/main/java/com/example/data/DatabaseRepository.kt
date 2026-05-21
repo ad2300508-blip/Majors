@@ -31,6 +31,7 @@ class DatabaseRepository(private val database: AppDatabase) {
     }
 
     suspend fun deleteNote(id: Long) {
+        database.flashcardDao().deleteFlashcardsByNoteId(id)
         database.noteDao().deleteNoteById(id)
     }
 

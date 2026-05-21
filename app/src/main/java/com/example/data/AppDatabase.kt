@@ -70,6 +70,9 @@ interface FlashcardDao {
 
     @Query("DELETE FROM flashcards WHERE id = :id")
     suspend fun deleteFlashcardById(id: Long)
+
+    @Query("DELETE FROM flashcards WHERE noteId = :noteId")
+    suspend fun deleteFlashcardsByNoteId(noteId: Long)
 }
 
 @Database(

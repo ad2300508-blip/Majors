@@ -642,9 +642,11 @@ fun CoursesScreen(
 ) {
     val courses by viewModel.courses.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
+    val notes by viewModel.notes.collectAsState()
 
     var showAddCourseDialog by remember { mutableStateOf(false) }
     var showAddAssignmentDialog by remember { mutableStateOf(false) }
+    var courseToDelete by remember { mutableStateOf<com.example.data.Course?>(null) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTablet = maxWidth > 720.dp
@@ -731,6 +733,7 @@ fun CoursesScreen(
                             ) {
                                 items(courses) { course ->
                                     val color = Color(android.graphics.Color.parseColor(course.colorHex))
+                                    val noteCount = notes.count { it.courseId == course.id }
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
                                         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.15f)),
@@ -748,7 +751,7 @@ fun CoursesScreen(
                                                     Text(course.code, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                                 }
                                                 IconButton(
-                                                    onClick = { viewModel.deleteCourse(course.id) },
+                                                    onClick = { courseToDelete = course },
                                                     modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
                                                 ) {
                                                     Icon(
@@ -764,10 +767,21 @@ fun CoursesScreen(
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text("Lec: ${course.instructor}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(course.schedule, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(course.schedule, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(14.dp), tint = color.copy(alpha = 0.7f))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("$noteCount note${if (noteCount != 1) "s" else ""}", style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold)
+                                                }
                                             }
                                         }
                                     }
@@ -881,6 +895,7 @@ fun CoursesScreen(
                     } else {
                         courses.forEach { course ->
                             val color = Color(android.graphics.Color.parseColor(course.colorHex))
+                            val noteCount = notes.count { it.courseId == course.id }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
@@ -893,13 +908,16 @@ fun CoursesScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
-                                            modifier = Modifier.background(color, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(course.code, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Box(
+                                                modifier = Modifier.background(color, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(course.code, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                            }
+                                            Text("$noteCount note${if (noteCount != 1) "s" else ""}", style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold)
                                         }
                                         IconButton(
-                                            onClick = { viewModel.deleteCourse(course.id) },
+                                            onClick = { courseToDelete = course },
                                             modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
                                         ) {
                                             Icon(
@@ -1134,6 +1152,37 @@ fun CoursesScreen(
                 ) { Text("Add Deadline") }
             },
             dismissButton = { TextButton(onClick = { showAddAssignmentDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    courseToDelete?.let { course ->
+        val noteCount = notes.count { it.courseId == course.id }
+        AlertDialog(
+            onDismissRequest = { courseToDelete = null },
+            title = { Text("Remove Course?") },
+            text = {
+                Column {
+                    Text("Are you sure you want to remove \"${course.name}\"?")
+                    if (noteCount > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "$noteCount note${if (noteCount != 1) "s" else ""} linked to this course will become unlinked.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCourse(course.id)
+                        courseToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { courseToDelete = null }) { Text("Cancel") } }
         )
     }
 }

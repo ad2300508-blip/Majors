@@ -179,6 +179,26 @@ fun NoteExplorerSidebar(
     onDeleteNote: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var noteToDelete by remember { mutableStateOf<Note?>(null) }
+
+    if (noteToDelete != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { noteToDelete = null },
+            title = { Text("Delete Note?") },
+            text = { Text("Delete \"${noteToDelete!!.title}\"? This will also remove its flashcards.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteNote(noteToDelete!!.id)
+                        noteToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { noteToDelete = null }) { Text("Cancel") } }
+        )
+    }
+
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
@@ -284,7 +304,7 @@ fun NoteExplorerSidebar(
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(
-                                    onClick = { onDeleteNote(note.id) },
+                                    onClick = { noteToDelete = note },
                                     modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
                                 ) {
                                     Icon(
