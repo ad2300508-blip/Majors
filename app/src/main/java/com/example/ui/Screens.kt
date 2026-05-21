@@ -1547,6 +1547,9 @@ fun SyncHubScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val isSyncWide = maxWidth > 560.dp
+        if (isSyncWide) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(24.dp)
@@ -1667,6 +1670,69 @@ fun SyncHubScreen(
                 }
             }
         }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // OAuth Status Card (mobile)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Account Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (email.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text("CONNECTED AS", style = MaterialTheme.typography.labelSmall)
+                                    Text(email, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                            Button(onClick = { viewModel.disconnectGoogleAccount() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                                Text("Disconnect")
+                            }
+                        } else {
+                            OutlinedTextField(value = customAccessTokenInput, onValueChange = { customAccessTokenInput = it }, label = { Text("OAuth Access Token") }, modifier = Modifier.fillMaxWidth())
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { if (customAccessTokenInput.isNotEmpty()) { viewModel.connectGoogleAccount("workspace.student@gmail.com", customAccessTokenInput); customAccessTokenInput = "" } }) { Text("Link") }
+                                OutlinedButton(onClick = { viewModel.connectGoogleAccount("demo@scholar-space.app", "MOCK_DEMO_TOKEN") }) { Text("Demo") }
+                            }
+                        }
+                    }
+                }
+
+                // Sync Status Card (mobile)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Drive Sync Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Synced:")
+                            Text("$syncedCount / ${notes.size}", fontWeight = FontWeight.Bold)
+                        }
+                        HorizontalDivider()
+                        when (syncState) {
+                            is SyncState.Idle -> Text("Standby", style = MaterialTheme.typography.bodySmall)
+                            is SyncState.Syncing -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Syncing...", style = MaterialTheme.typography.bodySmall)
+                            }
+                            is SyncState.Success -> Text("Sync successful!", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            is SyncState.Error -> Text("Error: ${(syncState as SyncState.Error).message}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+        } // end BoxWithConstraints
     }
 }
 

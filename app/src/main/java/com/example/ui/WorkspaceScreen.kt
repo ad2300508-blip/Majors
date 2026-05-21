@@ -1219,6 +1219,17 @@ fun ActiveNoteEditor(
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                     )
                 )
+
+                val wordCount = remember(text) {
+                    if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).size
+                }
+                val charCount = text.length
+                Text(
+                    text = "$wordCount words · $charCount chars",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
+                )
             }
         })
     }
