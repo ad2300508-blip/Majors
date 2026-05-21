@@ -412,9 +412,9 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     }
 
     // Assignments Operations
-    fun addAssignment(title: String, dueDate: String, courseId: Long? = null, notes: String = "") {
+    fun addAssignment(title: String, dueDate: String, courseId: Long? = null, notes: String = "", priority: String = "medium") {
         viewModelScope.launch {
-            repository.insertAssignment(Assignment(courseId = courseId, title = title, dueDate = dueDate, notes = notes))
+            repository.insertAssignment(Assignment(courseId = courseId, title = title, dueDate = dueDate, notes = notes, priority = priority))
         }
     }
 

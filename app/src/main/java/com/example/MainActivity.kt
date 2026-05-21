@@ -142,7 +142,7 @@ fun PageContent(page: String, viewModel: AppViewModel, onNavigate: (String) -> U
     when (page) {
         "dashboard"  -> DashboardScreen(viewModel = viewModel, onCreateNote = { viewModel.createNewNote(); onNavigate("notes") }, onNavigateToPage = onNavigate)
         "notes"      -> WorkspaceScreen(viewModel = viewModel)
-        "courses"    -> CoursesScreen(viewModel = viewModel)
+        "courses"    -> CoursesScreen(viewModel = viewModel, onNavigateToPage = onNavigate)
         "flashcards" -> FlashcardStudyScreen(viewModel = viewModel)
         "synchub"    -> SyncHubScreen(viewModel = viewModel)
     }

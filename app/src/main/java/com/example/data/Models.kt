@@ -64,7 +64,8 @@ data class Assignment(
     val title: String,
     val dueDate: String,
     val notes: String = "",
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "medium") val priority: String = "medium"
 )
 
 @Entity(tableName = "flashcards")
