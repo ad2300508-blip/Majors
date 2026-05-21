@@ -1532,7 +1532,6 @@ fun SyncHubScreen(
     val notes by viewModel.notes.collectAsState()
 
     var customAccessTokenInput by remember { mutableStateOf("") }
-    var mockEnabled by remember { mutableStateOf(false) }
 
     val syncedCount = notes.count { it.isSynced }
 
