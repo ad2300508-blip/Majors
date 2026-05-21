@@ -51,6 +51,11 @@ fun DrawingCanvas(
     val currentSelectedWidth by rememberUpdatedState(selectedWidth)
     val currentIsEraser by rememberUpdatedState(isEraser)
 
+    // Clear temporary live points only when database propagation is completed
+    LaunchedEffect(strokes) {
+        livePoints.clear()
+    }
+
     Box(
         modifier = modifier
             .background(Color.White) // High contrast drawing slate
@@ -108,6 +113,7 @@ fun DrawingCanvas(
                                             }
                                         }
                                         onStrokesChanged(updated)
+                                        livePoints.clear()
                                     } else {
                                         val strokeColor = currentSelectedColor.value.toLong().toInt()
                                         val stroke = DrawingStroke(
@@ -118,7 +124,19 @@ fun DrawingCanvas(
                                         onStrokesChanged(currentStrokes + stroke)
                                     }
                                 }
-                                livePoints.clear()
+                            },
+                            onDragCancel = {
+                                if (livePoints.isNotEmpty() && !currentIsEraser) {
+                                    val strokeColor = currentSelectedColor.value.toLong().toInt()
+                                    val stroke = DrawingStroke(
+                                        points = livePoints.toList(),
+                                        color = strokeColor,
+                                        width = currentSelectedWidth
+                                    )
+                                    onStrokesChanged(currentStrokes + stroke)
+                                } else {
+                                    livePoints.clear()
+                                }
                             }
                         )
                     }

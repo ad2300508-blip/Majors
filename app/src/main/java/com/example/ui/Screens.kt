@@ -482,6 +482,7 @@ fun NoteRowItem(
 // -----------------------------------------------------
 // 2. COURSES SCREEN (CLASSES & ASSIGNMENTS)
 // -----------------------------------------------------
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CoursesScreen(
     viewModel: AppViewModel,
@@ -780,54 +781,107 @@ fun CoursesScreen(
 
         // dialogs
         if (showAddCourseDialog) {
-        var name by remember { mutableStateOf("") }
-        var code by remember { mutableStateOf("") }
-        var instructor by remember { mutableStateOf("") }
-        var schedule by remember { mutableStateOf("") }
-        val colors = listOf("#1E88E5", "#D81B60", "#43A047", "#8E24AA", "#FFB300", "#00ACC1")
-        var selectedColor by remember { mutableStateOf(colors.first()) }
+            var name by remember { mutableStateOf("") }
+            var code by remember { mutableStateOf("") }
+            var instructor by remember { mutableStateOf("") }
+            var timeInput by remember { mutableStateOf("") }
+            var selectedDays by remember { mutableStateOf(setOf<String>()) }
+            val colors = listOf("#1E88E5", "#D81B60", "#43A047", "#8E24AA", "#FFB300", "#00ACC1")
+            var selectedColor by remember { mutableStateOf(colors.first()) }
 
-        AlertDialog(
-            onDismissRequest = { showAddCourseDialog = false },
-            title = { Text("Enroll in Class") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Course Name") })
-                    OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Course Code (e.g. CS101)") })
-                    OutlinedTextField(value = instructor, onValueChange = { instructor = it }, label = { Text("Instructor Name") })
-                    OutlinedTextField(value = schedule, onValueChange = { schedule = it }, label = { Text("Schedule Description") })
+            AlertDialog(
+                onDismissRequest = { showAddCourseDialog = false },
+                title = { Text("Enroll in Class") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Course Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = { code = it },
+                            label = { Text("Course Code (e.g. CS101)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = instructor,
+                            onValueChange = { instructor = it },
+                            label = { Text("Instructor Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
-                    Text("Pick Course Color")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        colors.forEach { col ->
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(Color(android.graphics.Color.parseColor(col)), CircleShape)
-                                    .border(
-                                        2.dp,
-                                        if (selectedColor == col) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                                        CircleShape
-                                    )
-                                    .clickable { selectedColor = col }
-                            )
+                        Text("Choose Class Days:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val daysOfWeekList = listOf("Mon", "Tue", "Wed", "Thu", "Fri")
+                            daysOfWeekList.forEach { dayAbbr ->
+                                val isSelected = selectedDays.contains(dayAbbr)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedDays = if (isSelected) {
+                                            selectedDays - dayAbbr
+                                        } else {
+                                            selectedDays + dayAbbr
+                                        }
+                                    },
+                                    label = { Text(dayAbbr, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = timeInput,
+                            onValueChange = { timeInput = it },
+                            placeholder = { Text("e.g. 10:00 AM - 11:30 AM") },
+                            label = { Text("Lecture Time") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text("Pick Course Color")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            colors.forEach { col ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color(android.graphics.Color.parseColor(col)), CircleShape)
+                                        .border(
+                                            2.dp,
+                                            if (selectedColor == col) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                            CircleShape
+                                        )
+                                        .clickable { selectedColor = col }
+                                )
+                            }
                         }
                     }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (name.isNotEmpty() && code.isNotEmpty()) {
-                            viewModel.addCourse(name, code, instructor, selectedColor, schedule)
-                            showAddCourseDialog = false
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (name.isNotEmpty() && code.isNotEmpty()) {
+                                val finalSchedule = if (selectedDays.isNotEmpty()) {
+                                    "${selectedDays.joinToString(", ")} ${timeInput.trim()}"
+                                } else {
+                                    timeInput.trim()
+                                }
+                                viewModel.addCourse(name, code, instructor, selectedColor, finalSchedule)
+                                showAddCourseDialog = false
+                            }
                         }
-                    }
-                ) { Text("Enroll") }
-            },
-            dismissButton = { TextButton(onClick = { showAddCourseDialog = false }) { Text("Cancel") } }
-        )
-    }
+                    ) { Text("Enroll") }
+                },
+                dismissButton = { TextButton(onClick = { showAddCourseDialog = false }) { Text("Cancel") } }
+            )
+        }
 
     if (showAddAssignmentDialog) {
         var title by remember { mutableStateOf("") }
