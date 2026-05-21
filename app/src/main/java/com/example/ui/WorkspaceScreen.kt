@@ -82,6 +82,7 @@ fun WorkspaceScreen(
                     onSelectNote = { viewModel.setActiveNote(it) },
                     onCreateNewNote = { viewModel.createNewNote() },
                     onDeleteNote = { viewModel.deleteNote(it) },
+                    onTogglePin = { viewModel.toggleNotePin(it) },
                     modifier = Modifier.width(320.dp).fillMaxHeight()
                 )
 
@@ -161,6 +162,7 @@ fun WorkspaceScreen(
                     onSelectNote = { viewModel.setActiveNote(it) },
                     onCreateNewNote = { viewModel.createNewNote() },
                     onDeleteNote = { viewModel.deleteNote(it) },
+                    onTogglePin = { viewModel.toggleNotePin(it) },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -180,6 +182,7 @@ fun NoteExplorerSidebar(
     onSelectNote: (Long) -> Unit,
     onCreateNewNote: () -> Unit,
     onDeleteNote: (Long) -> Unit,
+    onTogglePin: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
@@ -335,16 +338,29 @@ fun NoteExplorerSidebar(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    IconButton(
-                                        onClick = { noteToDelete = note },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete note",
-                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    Row {
+                                        IconButton(
+                                            onClick = { onTogglePin(note.id) },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.PushPin,
+                                                contentDescription = if (note.isPinned) "Unpin note" else "Pin note",
+                                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { noteToDelete = note },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Delete note",
+                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(3.dp))

@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,8 +25,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import kotlinx.coroutines.delay
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -119,7 +126,11 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 14.dp))
 
             if (isTablet) {
-                WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = true)
+                // Pomodoro + Schedule side by side on tablet
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    PomodoroTimerCard(modifier = Modifier.width(220.dp))
+                    WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = true, modifier = Modifier.weight(1f))
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -133,6 +144,7 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    PomodoroTimerCard()
                     WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = false)
                     DashboardRecentNotesCard(notes = notes, courses = courses, viewModel = viewModel, onNavigate = onNavigateToPage)
                     DashboardPendingCard(pending = pending, courses = courses)
@@ -434,94 +446,89 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     val courses     by viewModel.courses.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
     val notes       by viewModel.notes.collectAsState()
+    val allGrades   by viewModel.allGrades.collectAsState()
 
     var showAddCourseDialog     by remember { mutableStateOf(false) }
     var showAddAssignmentDialog by remember { mutableStateOf(false) }
+    var showAddGradeDialog      by remember { mutableStateOf(false) }
     var courseToDelete          by remember { mutableStateOf<Course?>(null) }
+    var selectedTab             by remember { mutableStateOf(0) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTablet = maxWidth > 720.dp
         val pad = if (isTablet) 24.dp else 16.dp
 
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = pad)) {
-            Spacer(modifier = Modifier.height(pad))
-            // Header
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // ── Header ────────────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = pad).padding(top = pad),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("My Courses", style = if (isTablet) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("${courses.size} enrolled · ${assignments.count { !it.isCompleted }} pending", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Academy", style = if (isTablet) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("${courses.size} courses · ${assignments.count { !it.isCompleted }} pending · ${allGrades.size} grades", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(onClick = { showAddAssignmentDialog = true }, modifier = Modifier.testTag("add_assignment_trigger")) {
-                        Icon(Icons.Default.AddAlert, contentDescription = "Add Assignment")
-                    }
-                    FilledIconButton(onClick = { showAddCourseDialog = true }, modifier = Modifier.testTag("add_course_trigger")) {
-                        Icon(Icons.Default.Add, contentDescription = "Enroll Class")
+                    when (selectedTab) {
+                        0 -> FilledIconButton(onClick = { showAddCourseDialog = true }, modifier = Modifier.testTag("add_course_trigger")) {
+                            Icon(Icons.Default.Add, contentDescription = "Enroll")
+                        }
+                        1 -> FilledTonalIconButton(onClick = { showAddGradeDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Grade")
+                        }
+                        2 -> FilledTonalIconButton(onClick = { showAddAssignmentDialog = true }, modifier = Modifier.testTag("add_assignment_trigger")) {
+                            Icon(Icons.Default.AddAlert, contentDescription = "Add Assignment")
+                        }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
 
-            if (isTablet) {
-                Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Column(modifier = Modifier.weight(1.3f)) {
-                        Text("Enrolled Courses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        if (courses.isEmpty()) {
-                            CourseEmptyState(onAdd = { showAddCourseDialog = true })
-                        } else {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                items(courses) { course ->
-                                    CourseCard(
-                                        course = course,
-                                        noteCount = notes.count { it.courseId == course.id },
-                                        onDelete = { courseToDelete = course }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Surface(modifier = Modifier.weight(1f).fillMaxHeight(), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
-                        AssignmentPanel(assignments = assignments, courses = courses, viewModel = viewModel)
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    if (courses.isEmpty()) {
-                        CourseEmptyState(onAdd = { showAddCourseDialog = true })
-                    } else {
-                        courses.forEach { course ->
-                            CourseCard(
-                                course = course,
-                                noteCount = notes.count { it.courseId == course.id },
-                                onDelete = { courseToDelete = course },
-                                compact = true
-                            )
-                        }
-                    }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text("Assignments", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (assignments.isEmpty()) {
-                        EmptyStateMinimal(icon = Icons.Default.CheckCircle, text = "No assignments yet")
-                    } else {
-                        assignments.forEach { assignment ->
-                            val course = courses.find { it.id == assignment.courseId }
-                            val urgency = remember(assignment.dueDate) { dueDateUrgency(assignment.dueDate) }
-                            AssignmentListItem(assignment = assignment, course = course, urgency = urgency, onToggle = { viewModel.toggleAssignmentCompleted(assignment) }, onDelete = { viewModel.deleteAssignment(assignment.id) })
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
+            // ── Tab row ───────────────────────────────────────────────────────
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = pad / 2),
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = {}
+            ) {
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 },
+                    text = { Text("Courses", style = MaterialTheme.typography.labelLarge) },
+                    icon = { Icon(Icons.Default.Class, contentDescription = null, modifier = Modifier.size(16.dp)) })
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 },
+                    text = { Text("Grades", style = MaterialTheme.typography.labelLarge) },
+                    icon = { Icon(Icons.Default.Grade, contentDescription = null, modifier = Modifier.size(16.dp)) })
+                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 },
+                    text = { Text("Deadlines", style = MaterialTheme.typography.labelLarge) },
+                    icon = { Icon(Icons.Default.Assignment, contentDescription = null, modifier = Modifier.size(16.dp)) })
+            }
+
+            // ── Tab content ───────────────────────────────────────────────────
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = pad)) {
+                when (selectedTab) {
+                    0 -> CourseListContent(
+                        courses = courses,
+                        notes = notes,
+                        isTablet = isTablet,
+                        onAddCourse = { showAddCourseDialog = true },
+                        onDeleteCourse = { courseToDelete = it }
+                    )
+                    1 -> GradeTrackerContent(
+                        courses = courses,
+                        allGrades = allGrades,
+                        isTablet = isTablet,
+                        onDeleteGrade = { viewModel.deleteGrade(it) }
+                    )
+                    2 -> DeadlinesContent(
+                        assignments = assignments,
+                        courses = courses,
+                        viewModel = viewModel
+                    )
                 }
             }
         }
 
+        // ── Dialogs ───────────────────────────────────────────────────────────
         if (showAddCourseDialog) {
             AddCourseDialog(
                 onDismiss = { showAddCourseDialog = false },
@@ -532,9 +539,15 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
         if (showAddAssignmentDialog) {
-            AddAssignmentDialog(courses = courses, onDismiss = { showAddAssignmentDialog = false }, onConfirm = { title, due, courseId, notes ->
-                viewModel.addAssignment(title, due, courseId, notes)
+            AddAssignmentDialog(courses = courses, onDismiss = { showAddAssignmentDialog = false }, onConfirm = { title, due, courseId, assignNotes ->
+                viewModel.addAssignment(title, due, courseId, assignNotes)
                 showAddAssignmentDialog = false
+            })
+        }
+        if (showAddGradeDialog) {
+            AddGradeDialog(courses = courses, onDismiss = { showAddGradeDialog = false }, onConfirm = { courseId, label, score, max, type, weight ->
+                viewModel.addGrade(courseId, label, score, max, type, weight)
+                showAddGradeDialog = false
             })
         }
         courseToDelete?.let { course ->
@@ -556,6 +569,240 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@Composable
+private fun CourseListContent(
+    courses: List<Course>,
+    notes: List<Note>,
+    isTablet: Boolean,
+    onAddCourse: () -> Unit,
+    onDeleteCourse: (Course) -> Unit,
+) {
+    if (courses.isEmpty()) {
+        CourseEmptyState(onAdd = onAddCourse)
+        return
+    }
+    if (isTablet) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(vertical = 14.dp)
+        ) {
+            items(courses) { course ->
+                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) })
+            }
+        }
+    } else {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 14.dp)) {
+            items(courses) { course ->
+                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) }, compact = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeadlinesContent(assignments: List<Assignment>, courses: List<Course>, viewModel: AppViewModel) {
+    if (assignments.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EmptyStateMinimal(icon = Icons.Default.CheckCircle, text = "No active assignments")
+        }
+        return
+    }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 14.dp)) {
+        items(assignments) { assignment ->
+            val course = courses.find { it.id == assignment.courseId }
+            val urgency = remember(assignment.dueDate) { dueDateUrgency(assignment.dueDate) }
+            AssignmentListItem(
+                assignment = assignment, course = course, urgency = urgency,
+                onToggle = { viewModel.toggleAssignmentCompleted(assignment) },
+                onDelete = { viewModel.deleteAssignment(assignment.id) }
+            )
+        }
+    }
+}
+
+@Composable
+fun GradeTrackerContent(
+    courses: List<Course>,
+    allGrades: List<Grade>,
+    isTablet: Boolean,
+    onDeleteGrade: (Long) -> Unit,
+) {
+    if (courses.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EmptyStateMinimal(icon = Icons.Default.Grade, text = "Enroll in courses to track grades")
+        }
+        return
+    }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 14.dp)) {
+        items(courses) { course ->
+            val courseGrades = allGrades.filter { it.courseId == course.id }
+            val gpa = if (courseGrades.isEmpty()) null else {
+                val weightedSum = courseGrades.sumOf { (it.score / it.maxScore * it.weight).toDouble() }
+                val totalWeight = courseGrades.sumOf { it.weight.toDouble() }
+                if (totalWeight > 0) (weightedSum / totalWeight * 100).toFloat() else null
+            }
+            val courseColor = Color(android.graphics.Color.parseColor(course.colorHex))
+            var expanded by remember { mutableStateOf(true) }
+
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(1.dp)
+            ) {
+                Column {
+                    // Color strip
+                    Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(courseColor))
+                    // Course header row
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = courseColor.copy(alpha = 0.15f)) {
+                                Text(course.code, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelMedium, color = courseColor, fontWeight = FontWeight.Bold)
+                            }
+                            Text(course.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (gpa != null) {
+                                val grade = Grade(courseId = course.id, label = "", score = gpa, maxScore = 100f)
+                                GpaChip(percentage = gpa, letterGrade = grade.letterGrade)
+                            } else {
+                                Text("No grades", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                            }
+                            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    AnimatedVisibility(visible = expanded) {
+                        Column(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (courseGrades.isEmpty()) {
+                                Text("No grades recorded for this course yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                            } else {
+                                courseGrades.forEach { g ->
+                                    GradeRow(grade = g, onDelete = { onDeleteGrade(g.id) })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GpaChip(percentage: Float, letterGrade: String) {
+    val color = when {
+        percentage >= 90f -> Color(0xFF2E7D32)
+        percentage >= 80f -> Color(0xFF1565C0)
+        percentage >= 70f -> Color(0xFFF57C00)
+        percentage >= 60f -> Color(0xFFE65100)
+        else              -> MaterialTheme.colorScheme.error
+    }
+    Surface(shape = RoundedCornerShape(8.dp), color = color.copy(alpha = 0.15f)) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(letterGrade, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = color)
+            Text("${"%.1f".format(percentage)}%", style = MaterialTheme.typography.labelSmall, color = color)
+        }
+    }
+}
+
+@Composable
+private fun GradeRow(grade: Grade, onDelete: () -> Unit) {
+    val typeColor = when (grade.type) {
+        "exam"     -> Color(0xFF1565C0)
+        "quiz"     -> Color(0xFF6A1B9A)
+        "homework" -> Color(0xFF2E7D32)
+        "project"  -> Color(0xFFF57C00)
+        else       -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(grade.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(4.dp), color = typeColor.copy(alpha = 0.12f)) {
+                    Text(grade.type.replaceFirstChar { it.uppercase() }, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), style = MaterialTheme.typography.labelSmall, color = typeColor)
+                }
+                Text("${grade.score.toInt()} / ${grade.maxScore.toInt()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        GpaChip(percentage = grade.percentage, letterGrade = grade.letterGrade)
+        Spacer(modifier = Modifier.width(4.dp))
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+fun AddGradeDialog(
+    courses: List<Course>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, String, Float, Float, String, Float) -> Unit,
+) {
+    var selectedCourseId by remember { mutableStateOf(courses.firstOrNull()?.id) }
+    var label  by remember { mutableStateOf("") }
+    var score  by remember { mutableStateOf("") }
+    var max    by remember { mutableStateOf("100") }
+    var weight by remember { mutableStateOf("1") }
+    val types  = listOf("exam", "quiz", "homework", "project", "other")
+    var selectedType by remember { mutableStateOf("exam") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Grade Entry") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (courses.isNotEmpty()) {
+                    Text("Course", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        courses.forEach { course ->
+                            val color = Color(android.graphics.Color.parseColor(course.colorHex))
+                            FilterChip(
+                                selected = selectedCourseId == course.id,
+                                onClick = { selectedCourseId = course.id },
+                                label = { Text(course.code, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = color.copy(alpha = 0.2f), selectedLabelColor = color)
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Label (e.g. Midterm Exam)") }, modifier = Modifier.fillMaxWidth())
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = score, onValueChange = { score = it }, label = { Text("Score") }, modifier = Modifier.weight(1f), singleLine = true)
+                    OutlinedTextField(value = max, onValueChange = { max = it }, label = { Text("Max") }, modifier = Modifier.weight(1f), singleLine = true)
+                    OutlinedTextField(value = weight, onValueChange = { weight = it }, label = { Text("Weight") }, modifier = Modifier.weight(1f), singleLine = true)
+                }
+                Text("Type", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    types.forEach { t ->
+                        FilterChip(selected = selectedType == t, onClick = { selectedType = t }, label = { Text(t.replaceFirstChar { it.uppercase() }, fontSize = 11.sp) })
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val s = score.toFloatOrNull() ?: return@Button
+                val m = max.toFloatOrNull() ?: return@Button
+                val w = weight.toFloatOrNull() ?: 1f
+                val cId = selectedCourseId ?: return@Button
+                if (label.isNotEmpty()) onConfirm(cId, label, s, m, selectedType, w)
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -1166,6 +1413,111 @@ private fun SyncStatusCard(syncedCount: Int, total: Int, syncState: SyncState, m
     }
 }
 
+// ─── Pomodoro Timer ───────────────────────────────────────────────────────────
+
+@Composable
+fun PomodoroTimerCard(modifier: Modifier = Modifier) {
+    var ticking   by remember { mutableStateOf(false) }
+    var isBreak   by remember { mutableStateOf(false) }
+    var secLeft   by remember { mutableStateOf(25 * 60) }
+    var sessions  by remember { mutableStateOf(0) }
+
+    val totalSecs = if (isBreak) 5 * 60 else 25 * 60
+    val progress  = secLeft.toFloat() / totalSecs
+    val mm = secLeft / 60
+    val ss = secLeft % 60
+    val timeLabel = "%02d:%02d".format(mm, ss)
+    val phaseLabel = if (isBreak) "Break" else "Focus"
+    val phaseColor = if (isBreak) Color(0xFF2E7D5A) else MaterialTheme.colorScheme.primary
+
+    // Tick every second when running
+    LaunchedEffect(ticking) {
+        while (ticking && secLeft > 0) {
+            delay(1000L)
+            secLeft--
+        }
+        if (ticking && secLeft == 0) {
+            if (!isBreak) sessions++
+            isBreak = !isBreak
+            secLeft = if (isBreak) 5 * 60 else 25 * 60
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Circular arc progress
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(72.dp)) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val strokeW = 6.dp.toPx()
+                    val inset = strokeW / 2f
+                    drawArc(
+                        color = phaseColor.copy(alpha = 0.15f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - strokeW, size.height - strokeW),
+                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                    )
+                    drawArc(
+                        color = phaseColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - strokeW, size.height - strokeW),
+                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(timeLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(phaseLabel, style = MaterialTheme.typography.labelSmall, color = phaseColor)
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Study Timer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    if (sessions > 0) {
+                        Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text("$sessions", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = { ticking = !ticking },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(if (ticking) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (ticking) "Pause" else if (secLeft < totalSecs) "Resume" else "Start", style = MaterialTheme.typography.labelMedium)
+                    }
+                    if (secLeft < totalSecs || isBreak) {
+                        OutlinedButton(
+                            onClick = { ticking = false; isBreak = false; secLeft = 25 * 60 },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ─── Metric cards ─────────────────────────────────────────────────────────────
 
 @Composable
@@ -1198,7 +1550,7 @@ fun MetricCard(title: String, value: String, icon: androidx.compose.ui.graphics.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WeeklyScheduleSection(courses: List<Course>, onAddClassClick: () -> Unit, isTablet: Boolean) {
+fun WeeklyScheduleSection(courses: List<Course>, onAddClassClick: () -> Unit, isTablet: Boolean, modifier: Modifier = Modifier) {
     val days = listOf("Monday","Tuesday","Wednesday","Thursday","Friday")
     val currentDay = remember {
         val cal = java.util.Calendar.getInstance()
@@ -1215,7 +1567,7 @@ fun WeeklyScheduleSection(courses: List<Course>, onAddClassClick: () -> Unit, is
     val dayCourses = courses.filter { isCourseDay(it.schedule, selectedDay) }
 
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("weekly_schedule_card"),
+        modifier = modifier.fillMaxWidth().testTag("weekly_schedule_card"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)

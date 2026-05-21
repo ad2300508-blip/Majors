@@ -392,6 +392,25 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
         }
     }
 
+    // Note Pin Toggle
+    fun toggleNotePin(noteId: Long) {
+        viewModelScope.launch { repository.toggleNotePin(noteId) }
+    }
+
+    // Grades
+    val allGrades: StateFlow<List<com.example.data.Grade>> = repository.allGrades
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addGrade(courseId: Long, label: String, score: Float, maxScore: Float, type: String, weight: Float = 1f) {
+        viewModelScope.launch {
+            repository.insertGrade(com.example.data.Grade(courseId = courseId, label = label, score = score, maxScore = maxScore, type = type, weight = weight))
+        }
+    }
+
+    fun deleteGrade(id: Long) {
+        viewModelScope.launch { repository.deleteGrade(id) }
+    }
+
     // Assignments Operations
     fun addAssignment(title: String, dueDate: String, courseId: Long? = null, notes: String = "") {
         viewModelScope.launch {

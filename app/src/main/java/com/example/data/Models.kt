@@ -35,10 +35,11 @@ data class Note(
     val courseId: Long? = null,
     val title: String,
     val textContent: String = "",
-    val drawingsJson: String = "[]", // Serialized List<DrawingStroke>
+    val drawingsJson: String = "[]",
     val lastModified: Long = System.currentTimeMillis(),
     val googleDriveFileId: String? = null,
-    val isSynced: Boolean = false
+    val isSynced: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "0") val isPinned: Boolean = false
 ) {
     fun getFormattedDate(): String {
         return java.text.DateFormat.getDateTimeInstance().format(java.util.Date(lastModified))
@@ -74,6 +75,27 @@ data class Flashcard(
     val answer: String,
     val nextReview: Long = System.currentTimeMillis()
 )
+
+@androidx.room.Entity(tableName = "grades")
+data class Grade(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseId: Long,
+    val label: String,
+    val score: Float,
+    val maxScore: Float,
+    val weight: Float = 1.0f,
+    val type: String = "other",   // exam | quiz | homework | project | other
+    val date: Long = System.currentTimeMillis()
+) {
+    val percentage: Float get() = if (maxScore > 0f) (score / maxScore) * 100f else 0f
+    val letterGrade: String get() = when {
+        percentage >= 90f -> "A"
+        percentage >= 80f -> "B"
+        percentage >= 70f -> "C"
+        percentage >= 60f -> "D"
+        else              -> "F"
+    }
+}
 
 class DatabaseTypeConverters {
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
