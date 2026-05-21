@@ -56,6 +56,7 @@ fun DashboardScreen(
     val assignments by viewModel.assignments.collectAsState()
 
     val pendingAssignments = assignments.filter { !it.isCompleted }
+    var showAddCourseDialog by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTablet = maxWidth > 720.dp
@@ -173,7 +174,7 @@ fun DashboardScreen(
             if (isTablet) {
                 WeeklyScheduleSection(
                     courses = courses,
-                    onAddClassClick = { onNavigateToPage("courses") },
+                    onAddClassClick = { showAddCourseDialog = true },
                     isTablet = true
                 )
 
@@ -281,7 +282,7 @@ fun DashboardScreen(
                 ) {
                     WeeklyScheduleSection(
                         courses = courses,
-                        onAddClassClick = { onNavigateToPage("courses") },
+                        onAddClassClick = { showAddCourseDialog = true },
                         isTablet = false
                     )
 
@@ -365,6 +366,109 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        if (showAddCourseDialog) {
+            var name by remember { mutableStateOf("") }
+            var code by remember { mutableStateOf("") }
+            var instructor by remember { mutableStateOf("") }
+            var timeInput by remember { mutableStateOf("") }
+            var selectedDays by remember { mutableStateOf(setOf<String>()) }
+            val colors = listOf("#1E88E5", "#D81B60", "#43A047", "#8E24AA", "#FFB300", "#00ACC1")
+            var selectedColor by remember { mutableStateOf(colors.first()) }
+
+            AlertDialog(
+                onDismissRequest = { showAddCourseDialog = false },
+                title = { Text("Enroll in Class") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Course Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = { code = it },
+                            label = { Text("Course Code (e.g. CS101)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = instructor,
+                            onValueChange = { instructor = it },
+                            label = { Text("Instructor Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text("Choose Class Days:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val daysOfWeekList = listOf("Mon", "Tue", "Wed", "Thu", "Fri")
+                            daysOfWeekList.forEach { dayAbbr ->
+                                val isSelected = selectedDays.contains(dayAbbr)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedDays = if (isSelected) {
+                                            selectedDays - dayAbbr
+                                        } else {
+                                            selectedDays + dayAbbr
+                                        }
+                                    },
+                                    label = { Text(dayAbbr, fontSize = 11.sp) }
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = timeInput,
+                            onValueChange = { timeInput = it },
+                            placeholder = { Text("e.g. 10:00 AM - 11:30 AM") },
+                            label = { Text("Lecture Time") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text("Pick Course Color")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            colors.forEach { col ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color(android.graphics.Color.parseColor(col)), CircleShape)
+                                        .border(
+                                            2.dp,
+                                            if (selectedColor == col) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                            CircleShape
+                                        )
+                                        .clickable { selectedColor = col }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (name.isNotEmpty() && code.isNotEmpty()) {
+                                val finalSchedule = if (selectedDays.isNotEmpty()) {
+                                    "${selectedDays.joinToString(", ")} ${timeInput.trim()}"
+                                } else {
+                                    timeInput.trim()
+                                }
+                                viewModel.addCourse(name, code, instructor, selectedColor, finalSchedule)
+                                showAddCourseDialog = false
+                            }
+                        }
+                    ) { Text("Enroll") }
+                },
+                dismissButton = { TextButton(onClick = { showAddCourseDialog = false }) { Text("Cancel") } }
+            )
         }
     }
 }
@@ -560,7 +664,15 @@ fun CoursesScreen(
                         if (courses.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("No courses registered. Click Enroll Class to begin.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("No courses registered. Get started today!", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { showAddCourseDialog = true }
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Enroll in a Class")
+                                    }
                                 }
                             }
                         } else {
@@ -683,8 +795,18 @@ fun CoursesScreen(
                     Text("Enrolled Courses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
                     if (courses.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                            Text("No courses registered.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("No courses registered.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { showAddCourseDialog = true }
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Enroll in a Class")
+                                }
+                            }
                         }
                     } else {
                         courses.forEach { course ->

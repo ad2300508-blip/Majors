@@ -535,15 +535,11 @@ fun ActiveNoteEditor(
             }
         }
 
-        // Split-pane editing layout (optimized for tablet viewport)
-        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            // Hand-writing canvas (Left division)
-            Column(
-                modifier = Modifier
-                    .weight(1.1f)
-                    .fillMaxHeight()
-                    .padding(12.dp)
-            ) {
+        // Split-pane responsive layout wrapper
+        ResponsiveSplitLayout(
+            isTablet = isTablet,
+            canvasSection = { canvasModifier ->
+                Column(modifier = canvasModifier) {
                 // Drawing workspace heading and action row
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
@@ -764,17 +760,10 @@ fun ActiveNoteEditor(
                         }
                     }
                 }
-            }
-
-            VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Transcription text document area (Right division)
-            Column(
-                modifier = Modifier
-                    .weight(0.9f)
-                    .fillMaxHeight()
-                    .padding(12.dp)
-            ) {
+                }
+            },
+            textSummarySection = { summaryModifier ->
+                Column(modifier = summaryModifier) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1169,7 +1158,7 @@ fun ActiveNoteEditor(
                     )
                 )
             }
-        }
+        })
     }
 }
 
@@ -1185,6 +1174,51 @@ fun EmptyWorkspaceState(onCreateNote: () -> Unit) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Create Note")
+            }
+        }
+    }
+}
+
+@Composable
+fun ColumnScope.ResponsiveSplitLayout(
+    isTablet: Boolean,
+    canvasSection: @Composable (Modifier) -> Unit,
+    textSummarySection: @Composable (Modifier) -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(0) }
+    if (isTablet) {
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            canvasSection(Modifier.weight(1.1f).fillMaxHeight().padding(12.dp))
+            VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            textSummarySection(Modifier.weight(0.9f).fillMaxHeight().padding(12.dp))
+        }
+    } else {
+        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Stylus Slate", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Gesture, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("AI Summary", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+            }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).padding(12.dp)) {
+                if (selectedTab == 0) {
+                    canvasSection(Modifier.fillMaxSize())
+                } else {
+                    textSummarySection(Modifier.fillMaxSize())
+                }
             }
         }
     }

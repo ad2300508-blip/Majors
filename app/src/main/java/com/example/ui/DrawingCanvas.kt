@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,11 +51,6 @@ fun DrawingCanvas(
     val currentSelectedColor by rememberUpdatedState(selectedColor)
     val currentSelectedWidth by rememberUpdatedState(selectedWidth)
     val currentIsEraser by rememberUpdatedState(isEraser)
-
-    // Clear temporary live points only when database propagation is completed
-    LaunchedEffect(strokes) {
-        livePoints.clear()
-    }
 
     Box(
         modifier = modifier
@@ -115,25 +111,27 @@ fun DrawingCanvas(
                                         onStrokesChanged(updated)
                                         livePoints.clear()
                                     } else {
-                                        val strokeColor = currentSelectedColor.value.toLong().toInt()
+                                        val strokeColor = currentSelectedColor.toArgb()
                                         val stroke = DrawingStroke(
                                             points = livePoints.toList(),
                                             color = strokeColor,
                                             width = currentSelectedWidth
                                         )
                                         onStrokesChanged(currentStrokes + stroke)
+                                        livePoints.clear()
                                     }
                                 }
                             },
                             onDragCancel = {
                                 if (livePoints.isNotEmpty() && !currentIsEraser) {
-                                    val strokeColor = currentSelectedColor.value.toLong().toInt()
+                                    val strokeColor = currentSelectedColor.toArgb()
                                     val stroke = DrawingStroke(
                                         points = livePoints.toList(),
                                         color = strokeColor,
                                         width = currentSelectedWidth
                                     )
                                     onStrokesChanged(currentStrokes + stroke)
+                                    livePoints.clear()
                                 } else {
                                     livePoints.clear()
                                 }
