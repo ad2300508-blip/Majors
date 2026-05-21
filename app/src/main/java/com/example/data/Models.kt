@@ -43,6 +43,17 @@ data class Note(
     fun getFormattedDate(): String {
         return java.text.DateFormat.getDateTimeInstance().format(java.util.Date(lastModified))
     }
+
+    fun getRelativeTime(): String {
+        val diff = System.currentTimeMillis() - lastModified
+        return when {
+            diff < 60_000 -> "Just now"
+            diff < 3_600_000 -> "${diff / 60_000}m ago"
+            diff < 86_400_000 -> "${diff / 3_600_000}h ago"
+            diff < 604_800_000 -> "${diff / 86_400_000}d ago"
+            else -> getFormattedDate()
+        }
+    }
 }
 
 @Entity(tableName = "assignments")

@@ -57,6 +57,10 @@ class DatabaseRepository(private val database: AppDatabase) {
         return database.flashcardDao().getFlashcardsByNote(noteId)
     }
 
+    suspend fun getFlashcardById(id: Long): Flashcard? {
+        return database.flashcardDao().getFlashcardById(id)
+    }
+
     suspend fun insertFlashcard(flashcard: Flashcard): Long {
         return database.flashcardDao().insertFlashcard(flashcard)
     }

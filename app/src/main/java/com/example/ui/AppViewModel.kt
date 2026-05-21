@@ -94,6 +94,9 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val _quizFlashcards = MutableStateFlow<List<Flashcard>>(emptyList())
     val quizFlashcards: StateFlow<List<Flashcard>> = _quizFlashcards.asStateFlow()
 
+    val allFlashcards: StateFlow<List<Flashcard>> = repository.upcomingFlashcards
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Assignments State & Operations
     val assignments: StateFlow<List<Assignment>> = repository.allAssignments
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -372,6 +375,20 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     fun deleteFlashcard(id: Long) {
         viewModelScope.launch {
             repository.deleteFlashcard(id)
+        }
+    }
+
+    fun markFlashcardReviewed(id: Long, correct: Boolean) {
+        viewModelScope.launch {
+            val card = repository.getFlashcardById(id) ?: return@launch
+            val nextReview = if (correct) {
+                val nowMs = System.currentTimeMillis()
+                val daysSinceReview = maxOf(1L, (nowMs - card.nextReview) / (1000L * 60 * 60 * 24))
+                nowMs + daysSinceReview * 2 * 24 * 60 * 60 * 1000L
+            } else {
+                System.currentTimeMillis() + 24 * 60 * 60 * 1000L
+            }
+            repository.insertFlashcard(card.copy(nextReview = nextReview))
         }
     }
 

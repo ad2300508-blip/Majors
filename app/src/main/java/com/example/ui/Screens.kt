@@ -838,9 +838,9 @@ fun CoursesScreen(
                                                                 val diffMs = due!!.time - now.time
                                                                 val diffDays = diffMs / (1000 * 60 * 60 * 24)
                                                                 when {
-                                                                    diffDays < 0 -> null // overdue = red
-                                                                    diffDays <= 2 -> 1 // soon = orange
-                                                                    else -> 2 // normal
+                                                                    diffDays < 0 -> null
+                                                                    diffDays <= 2 -> 1
+                                                                    else -> 2
                                                                 }
                                                             } catch (e: Exception) { 2 }
                                                         }
@@ -853,6 +853,9 @@ fun CoursesScreen(
                                                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                                                             }
                                                         )
+                                                        if (assignment.notes.isNotEmpty()) {
+                                                            Text(assignment.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                                        }
                                                     }
                                                 }
                                                 IconButton(onClick = { viewModel.deleteAssignment(assignment.id) }) {
@@ -1118,15 +1121,20 @@ fun CoursesScreen(
     if (showAddAssignmentDialog) {
         var title by remember { mutableStateOf("") }
         var dueDate by remember { mutableStateOf("") }
+        var assignmentNotes by remember { mutableStateOf("") }
         var selectedCourseId by remember { mutableStateOf<Long?>(null) }
 
         AlertDialog(
             onDismissRequest = { showAddAssignmentDialog = false },
             title = { Text("Add Assignment Deadline") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Assignment Title") })
-                    OutlinedTextField(value = dueDate, onValueChange = { dueDate = it }, placeholder = { Text("YYYY-MM-DD") }, label = { Text("Due Date") })
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Assignment Title") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = dueDate, onValueChange = { dueDate = it }, placeholder = { Text("YYYY-MM-DD") }, label = { Text("Due Date") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = assignmentNotes, onValueChange = { assignmentNotes = it }, label = { Text("Notes (Optional)") }, modifier = Modifier.fillMaxWidth(), maxLines = 2)
 
                     Text("Associate class (Optional)")
                     courses.forEach { course ->
@@ -1145,7 +1153,7 @@ fun CoursesScreen(
                 Button(
                     onClick = {
                         if (title.isNotEmpty()) {
-                            viewModel.addAssignment(title, dueDate, selectedCourseId)
+                            viewModel.addAssignment(title, dueDate, selectedCourseId, assignmentNotes)
                             showAddAssignmentDialog = false
                         }
                     }
@@ -1198,15 +1206,19 @@ fun FlashcardStudyScreen(
     modifier: Modifier = Modifier
 ) {
     val quizCards by viewModel.quizFlashcards.collectAsState()
+    val allFlashcards by viewModel.allFlashcards.collectAsState()
     val activeNoteId by viewModel.activeNoteId.collectAsState()
     val generationActive by viewModel.flashcardGenerationActive.collectAsState()
 
-    var cardIndex by remember { mutableStateOf(0) }
-    var flipStatus by remember { mutableStateOf(false) } // False: question, True: answer
+    val displayCards = if (activeNoteId != null) quizCards else allFlashcards
 
-    LaunchedEffect(quizCards.size) {
-        if (quizCards.isNotEmpty() && cardIndex >= quizCards.size) {
-            cardIndex = quizCards.size - 1
+    var cardIndex by remember { mutableStateOf(0) }
+    var flipStatus by remember { mutableStateOf(false) }
+    var studyScore by remember { mutableStateOf(0 to 0) } // correct to total
+
+    LaunchedEffect(displayCards.size) {
+        if (displayCards.isNotEmpty() && cardIndex >= displayCards.size) {
+            cardIndex = displayCards.size - 1
             flipStatus = false
         }
     }
@@ -1256,9 +1268,13 @@ fun FlashcardStudyScreen(
                         }
                     } else {
                         Box(
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(12.dp)
+                            modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(12.dp)
                         ) {
-                            Text("Select a Note from Workspace to activate study deck options.", fontSize = 12.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Showing all ${allFlashcards.size} flashcards. Open a note to generate more.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -1287,9 +1303,13 @@ fun FlashcardStudyScreen(
                         }
                     } else {
                         Box(
-                            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp)
+                            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp)
                         ) {
-                            Text("Select a Note from Workspace to activate study deck options.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Showing all ${allFlashcards.size} flashcards across all notes.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -1297,7 +1317,7 @@ fun FlashcardStudyScreen(
 
             Spacer(modifier = Modifier.height(if (isTablet) 36.dp else 24.dp))
 
-            if (quizCards.isEmpty()) {
+            if (displayCards.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.CardMembership, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
@@ -1307,10 +1327,10 @@ fun FlashcardStudyScreen(
                     }
                 }
             } else {
-                val safeIndex = cardIndex.coerceIn(0, quizCards.size - 1)
-                val activeCard = quizCards[safeIndex]
+                val safeIndex = cardIndex.coerceIn(0, displayCards.size - 1)
+                val activeCard = displayCards[safeIndex]
 
-                Text("CARD ${safeIndex + 1} OF ${quizCards.size}", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                Text("CARD ${safeIndex + 1} OF ${displayCards.size}", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Study deck flipping card container using overlapping perspective
@@ -1380,7 +1400,7 @@ fun FlashcardStudyScreen(
                     Button(
                         onClick = {
                             flipStatus = false
-                            cardIndex = (cardIndex - 1 + quizCards.size) % quizCards.size
+                            cardIndex = (cardIndex - 1 + displayCards.size) % displayCards.size
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.outline)
                     ) {
@@ -1392,7 +1412,7 @@ fun FlashcardStudyScreen(
                     Button(
                         onClick = {
                             flipStatus = false
-                            cardIndex = (cardIndex + 1) % quizCards.size
+                            cardIndex = (cardIndex + 1) % displayCards.size
                         }
                     ) {
                         Text("Next", fontSize = 12.sp)
@@ -1406,6 +1426,50 @@ fun FlashcardStudyScreen(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete card", tint = Color.Red.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
                     }
+                }
+
+                if (flipStatus) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.markFlashcardReviewed(activeCard.id, correct = false)
+                                studyScore = studyScore.copy(second = studyScore.second + 1)
+                                flipStatus = false
+                                cardIndex = (cardIndex + 1) % displayCards.size
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.85f))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Missed it", fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.markFlashcardReviewed(activeCard.id, correct = true)
+                                studyScore = studyScore.copy(first = studyScore.first + 1, second = studyScore.second + 1)
+                                flipStatus = false
+                                cardIndex = (cardIndex + 1) % displayCards.size
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Knew it!", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (studyScore.second > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Session: ${studyScore.first}/${studyScore.second} correct",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (studyScore.first.toFloat() / studyScore.second >= 0.7f) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
@@ -1542,14 +1606,15 @@ fun SyncHubScreen(
                                 Text("Link OAuth")
                             }
 
-                            Button(
+                            OutlinedButton(
                                 onClick = {
-                                    // Simulated high fidelity sync for instant user playing
-                                    viewModel.connectGoogleAccount("dev.student.s10@gmail.com", "MOCK_DEVELOPMENT_DRIVE_OAUTH_TOKEN_ACTIVE")
+                                    viewModel.connectGoogleAccount("demo@scholar-space.app", "MOCK_DEMO_TOKEN")
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                             ) {
-                                Text("Quick Connect Demo Account")
+                                Icon(Icons.Default.Science, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Try Demo Mode")
                             }
                         }
                     }

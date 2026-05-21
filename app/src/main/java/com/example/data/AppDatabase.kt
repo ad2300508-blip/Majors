@@ -62,6 +62,9 @@ interface FlashcardDao {
     @Query("SELECT * FROM flashcards WHERE noteId = :noteId")
     fun getFlashcardsByNote(noteId: Long): Flow<List<Flashcard>>
 
+    @Query("SELECT * FROM flashcards WHERE id = :id LIMIT 1")
+    suspend fun getFlashcardById(id: Long): Flashcard?
+
     @Query("SELECT * FROM flashcards ORDER BY nextReview ASC")
     fun getUpcomingFlashcards(): Flow<List<Flashcard>>
 

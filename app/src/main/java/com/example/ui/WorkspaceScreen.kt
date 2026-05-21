@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -7,9 +8,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -237,7 +241,10 @@ fun NoteExplorerSidebar(
         Text("Sort By Class", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(6.dp))
         Row(
-            modifier = Modifier.fillMaxWidth().height(40.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // "All" filter chip
@@ -330,7 +337,7 @@ fun NoteExplorerSidebar(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = note.getFormattedDate(),
+                                    text = note.getRelativeTime(),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
@@ -379,6 +386,8 @@ fun ActiveNoteEditor(
     isTablet: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     // Canvas dimension states to accurately render export Bitmaps
     var canvasWidth by remember { mutableStateOf(400) }
     var canvasHeight by remember { mutableStateOf(400) }
@@ -552,6 +561,21 @@ fun ActiveNoteEditor(
                         else -> Icon(Icons.Default.CloudUpload, contentDescription = "Sync to G-Drive", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
+                // Share note text
+                IconButton(
+                    onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, title)
+                            putExtra(Intent.EXTRA_TEXT, "$title\n\n$text")
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Note"))
+                    },
+                    enabled = text.isNotEmpty(),
+                    modifier = Modifier.testTag("share_note_button")
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = "Share Note", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
 
@@ -652,7 +676,25 @@ fun ActiveNoteEditor(
                                 tint = if (isEraserEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        IconButton(onClick = { onStrokesChange(emptyList()) }) {
+                        var showClearCanvasDialog by remember { mutableStateOf(false) }
+                        if (showClearCanvasDialog) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { showClearCanvasDialog = false },
+                                title = { Text("Clear Canvas?") },
+                                text = { Text("All drawings on this canvas will be permanently removed.") },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            onStrokesChange(emptyList())
+                                            showClearCanvasDialog = false
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                    ) { Text("Clear") }
+                                },
+                                dismissButton = { TextButton(onClick = { showClearCanvasDialog = false }) { Text("Cancel") } }
+                            )
+                        }
+                        IconButton(onClick = { showClearCanvasDialog = true }) {
                             Icon(Icons.Default.Clear, contentDescription = "Clear Canvas", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
                         }
                     }
