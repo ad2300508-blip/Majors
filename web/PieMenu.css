@@ -1,0 +1,294 @@
+/* ─── Canvas wrapper ──────────────────────────────────────────────────────── */
+.pie-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+/* ─── Menu root (absolutely positioned at long-press origin) ──────────────── */
+.pie-menu-root {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none; /* children opt-in */
+}
+
+.pie-svg {
+  display: block;
+  pointer-events: none;
+  overflow: visible;
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.55));
+}
+
+/* ─── Spring animation (enter) ────────────────────────────────────────────── */
+.pie-menu-root {
+  animation: pieOpen 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes pieOpen {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* ─── Central circle ─────────────────────────────────────────────────────── */
+.center-circle {
+  fill: #232323;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: fill 200ms ease;
+  pointer-events: all;
+  cursor: default;
+}
+
+.center-circle.center-ai {
+  fill: #00897b; /* teal */
+  filter: drop-shadow(0 0 12px rgba(0, 200, 170, 0.6));
+}
+
+/* ─── AI label ────────────────────────────────────────────────────────────── */
+.ai-label {
+  fill: #ffffff;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  animation: fadeUp 180ms ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; translate: 0 6px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+/* ─── Main icon foreignObject ────────────────────────────────────────────── */
+.main-icon-fo {
+  pointer-events: all;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.main-icon-inner {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.main-icon-inner svg {
+  width: 20px;
+  height: 20px;
+}
+
+.main-icon-fo:hover .main-icon-inner,
+.main-icon-fo.active .main-icon-inner {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.15);
+}
+
+.main-icon-fo.active .main-icon-inner {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ─── Pen arc background ─────────────────────────────────────────────────── */
+.pen-arc-bg {
+  fill: rgba(30, 30, 35, 0.88);
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+  backdrop-filter: blur(8px);
+  animation: pieOpen 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ─── Pen icon foreignObject ─────────────────────────────────────────────── */
+.pen-icon-fo {
+  pointer-events: all;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.pen-icon-inner {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  transition:
+    color 130ms ease,
+    background 130ms ease,
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pen-icon-inner svg {
+  width: 22px;
+  height: 22px;
+}
+
+.pen-icon-fo:hover .pen-icon-inner {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.2);
+}
+
+.pen-icon-fo.active .pen-icon-inner {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.15);
+}
+
+/* ─── Tooltip via data-label ─────────────────────────────────────────────── */
+.pen-icon-fo[data-label]:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Color ring ─────────────────────────────────────────────────────────── */
+.color-ring-portal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: all;
+  animation: pieOpen 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.color-ring-wrap {
+  position: relative;
+  cursor: crosshair;
+}
+
+.color-ring {
+  border-radius: 50%;
+  background: conic-gradient(
+    hsl(0,   100%, 55%),
+    hsl(30,  100%, 55%),
+    hsl(60,  100%, 55%),
+    hsl(90,  100%, 55%),
+    hsl(120, 100%, 55%),
+    hsl(150, 100%, 55%),
+    hsl(180, 100%, 55%),
+    hsl(210, 100%, 55%),
+    hsl(240, 100%, 55%),
+    hsl(270, 100%, 55%),
+    hsl(300, 100%, 55%),
+    hsl(330, 100%, 55%),
+    hsl(360, 100%, 55%)
+  );
+  /* Donut mask: keeps only the ring between --inner-r and --outer-r */
+  mask: radial-gradient(
+    circle,
+    transparent var(--inner-r),
+    black calc(var(--inner-r) + 1px),
+    black var(--outer-r),
+    transparent calc(var(--outer-r) + 1px)
+  );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent var(--inner-r),
+    black calc(var(--inner-r) + 1px),
+    black var(--outer-r),
+    transparent calc(var(--outer-r) + 1px)
+  );
+  position: absolute;
+  inset: 0;
+}
+
+.color-ring-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transition: transform 60ms linear, background-color 60ms linear;
+}
+
+/* ─── 'T' text tool button ───────────────────────────────────────────────── */
+.text-tool-btn {
+  position: absolute;
+  /* ~88px left of center, vertically centered */
+  top: 50%;
+  left: calc(50% - 88px);
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(35, 35, 35, 0.92);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 17px;
+  font-weight: 600;
+  font-family: Georgia, serif;
+  cursor: pointer;
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 130ms ease,
+    color 130ms ease,
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  animation: pieOpen 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.text-tool-btn:hover {
+  background: rgba(60, 60, 68, 0.97);
+  color: #fff;
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.text-tool-btn:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+/* ─── State-specific overrides ───────────────────────────────────────────── */
+
+/* When pen submenu is active: slightly dim the main icons that aren't hovered */
+.pie-state-pen_submenu .main-icon-fo:not(.active) .main-icon-inner {
+  opacity: 0.5;
+}
+
+/* When color submenu is active: hide the main icons (ring replaces them) */
+.pie-state-color_submenu .main-icon-fo {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+/* ─── Responsive – shrink slightly on small screens ──────────────────────── */
+@media (max-width: 480px) {
+  .pie-menu-root {
+    scale: 0.82;
+    transform-origin: center center;
+  }
+}

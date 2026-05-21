@@ -10,6 +10,8 @@ import com.example.network.GoogleDriveClient
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -92,6 +94,9 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val _quizFlashcards = MutableStateFlow<List<Flashcard>>(emptyList())
     val quizFlashcards: StateFlow<List<Flashcard>> = _quizFlashcards.asStateFlow()
 
+    val allFlashcards: StateFlow<List<Flashcard>> = repository.upcomingFlashcards
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Assignments State & Operations
     val assignments: StateFlow<List<Assignment>> = repository.allAssignments
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -101,7 +106,11 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val strokesType = Types.newParameterizedType(List::class.java, DrawingStroke::class.java)
     private val strokesAdapter = moshi.adapter<List<DrawingStroke>>(strokesType)
 
+    private var flashcardCollectionJob: Job? = null
+    private var saveDebounceJob: Job? = null
+
     fun setActiveNote(noteId: Long?) {
+        flashcardCollectionJob?.cancel()
         viewModelScope.launch {
             _activeNoteId.value = noteId
             if (noteId != null) {
@@ -111,9 +120,10 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
                     _activeNoteText.value = note.textContent
                     _activeNoteCourseId.value = note.courseId
                     _activeNoteStrokes.value = strokesAdapter.fromJson(note.drawingsJson) ?: emptyList()
-                    // Fetch flashcards for this note
-                    repository.getFlashcardsByNote(noteId).collectLatest { flashcards ->
-                        _quizFlashcards.value = flashcards
+                    flashcardCollectionJob = viewModelScope.launch {
+                        repository.getFlashcardsByNote(noteId).collectLatest { flashcards ->
+                            _quizFlashcards.value = flashcards
+                        }
                     }
                 }
             } else {
@@ -148,16 +158,17 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
 
     private fun saveActiveNoteStateLocally() {
         val noteId = _activeNoteId.value ?: return
-        val currentTitle = _activeNoteTitle.value
-        val currentText = _activeNoteText.value
-        val currentCourseId = _activeNoteCourseId.value
-        val strokesJson = try {
-            strokesAdapter.toJson(_activeNoteStrokes.value)
-        } catch (e: Exception) {
-            "[]"
-        }
-
-        viewModelScope.launch {
+        saveDebounceJob?.cancel()
+        saveDebounceJob = viewModelScope.launch {
+            delay(400)
+            val currentTitle = _activeNoteTitle.value
+            val currentText = _activeNoteText.value
+            val currentCourseId = _activeNoteCourseId.value
+            val strokesJson = try {
+                strokesAdapter.toJson(_activeNoteStrokes.value)
+            } catch (e: Exception) {
+                "[]"
+            }
             val existing = repository.getNoteById(noteId)
             val updated = Note(
                 id = noteId,
@@ -365,6 +376,39 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
         viewModelScope.launch {
             repository.deleteFlashcard(id)
         }
+    }
+
+    fun markFlashcardReviewed(id: Long, correct: Boolean) {
+        viewModelScope.launch {
+            val card = repository.getFlashcardById(id) ?: return@launch
+            val nextReview = if (correct) {
+                val nowMs = System.currentTimeMillis()
+                val daysSinceReview = maxOf(1L, (nowMs - card.nextReview) / (1000L * 60 * 60 * 24))
+                nowMs + daysSinceReview * 2 * 24 * 60 * 60 * 1000L
+            } else {
+                System.currentTimeMillis() + 24 * 60 * 60 * 1000L
+            }
+            repository.insertFlashcard(card.copy(nextReview = nextReview))
+        }
+    }
+
+    // Note Pin Toggle
+    fun toggleNotePin(noteId: Long) {
+        viewModelScope.launch { repository.toggleNotePin(noteId) }
+    }
+
+    // Grades
+    val allGrades: StateFlow<List<com.example.data.Grade>> = repository.allGrades
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addGrade(courseId: Long, label: String, score: Float, maxScore: Float, type: String, weight: Float = 1f) {
+        viewModelScope.launch {
+            repository.insertGrade(com.example.data.Grade(courseId = courseId, label = label, score = score, maxScore = maxScore, type = type, weight = weight))
+        }
+    }
+
+    fun deleteGrade(id: Long) {
+        viewModelScope.launch { repository.deleteGrade(id) }
     }
 
     // Assignments Operations
