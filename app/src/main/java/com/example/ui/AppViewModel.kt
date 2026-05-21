@@ -63,6 +63,10 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val _ocrActive = MutableStateFlow(false)
     val ocrActive: StateFlow<Boolean> = _ocrActive.asStateFlow()
 
+    // Gemini S-Pen Drawing Solver / Explainer State
+    private val _handwritingSolvingActive = MutableStateFlow(false)
+    val handwritingSolvingActive: StateFlow<Boolean> = _handwritingSolvingActive.asStateFlow()
+
     // Google Ecosystem / Drive Sync credentials
     private val _googleAccessToken = MutableStateFlow<String>("")
     val googleAccessToken: StateFlow<String> = _googleAccessToken.asStateFlow()
@@ -77,6 +81,13 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     // Flashcard generation state
     private val _flashcardGenerationActive = MutableStateFlow(false)
     val flashcardGenerationActive: StateFlow<Boolean> = _flashcardGenerationActive.asStateFlow()
+
+    // Note AI Assistant state
+    private val _aiAssistantActive = MutableStateFlow(false)
+    val aiAssistantActive: StateFlow<Boolean> = _aiAssistantActive.asStateFlow()
+
+    private val _lectureTranscribingActive = MutableStateFlow(false)
+    val lectureTranscribingActive: StateFlow<Boolean> = _lectureTranscribingActive.asStateFlow()
 
     private val _quizFlashcards = MutableStateFlow<List<Flashcard>>(emptyList())
     val quizFlashcards: StateFlow<List<Flashcard>> = _quizFlashcards.asStateFlow()
@@ -242,6 +253,72 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
                 updateActiveNoteText(newText)
             }
             _ocrActive.value = false
+        }
+    }
+
+    // Gemini S-Pen solver & visual diagram/concept explainer
+    fun solveOrExplainHandwriting(canvasBitmap: Bitmap) {
+        viewModelScope.launch {
+            _handwritingSolvingActive.value = true
+            val explanation = GeminiClient.solveOrExplainHandwriting(canvasBitmap)
+            if (explanation.isNotEmpty() && !explanation.startsWith("Analysis failed") && !explanation.startsWith("Error")) {
+                val currentText = _activeNoteText.value
+                val newText = if (currentText.isEmpty()) {
+                    "=== S-PEN SKETCH STUDY REPORT ===\n$explanation"
+                } else {
+                    "$currentText\n\n=== S-PEN SKETCH STUDY REPORT ===\n$explanation"
+                }
+                updateActiveNoteText(newText)
+            }
+            _handwritingSolvingActive.value = false
+        }
+    }
+
+    // AI Academic Assistant: Auto format / Concept deep-dive
+    fun runNoteAiAssistant(mode: String) {
+        val noteId = _activeNoteId.value ?: return
+        val currentTitle = _activeNoteTitle.value
+        val currentText = _activeNoteText.value
+        if (currentText.isEmpty()) return
+
+        viewModelScope.launch {
+            _aiAssistantActive.value = true
+            val responseText = when (mode) {
+                "format" -> GeminiClient.formatNotes(currentTitle, currentText)
+                "explain" -> GeminiClient.explainNotes(currentTitle, currentText)
+                else -> ""
+            }
+            if (responseText.isNotEmpty() && !responseText.contains("failed") && !responseText.contains("Error: ")) {
+                val updatedText = if (mode == "format") {
+                    responseText // Replace completely with beautiful format
+                } else {
+                    // Append detailed analysis
+                    "$currentText\n\n=== AI TOPIC DEEP DIVE ===\n$responseText"
+                }
+                updateActiveNoteText(updatedText)
+            }
+            _aiAssistantActive.value = false
+        }
+    }
+
+    // AI Voice Lecture Transcriber & Audio Summarizer
+    fun runVoiceLectureTranscriber() {
+        val noteId = _activeNoteId.value ?: return
+        val currentTitle = _activeNoteTitle.value
+        val currentText = _activeNoteText.value
+
+        viewModelScope.launch {
+            _lectureTranscribingActive.value = true
+            val responseText = GeminiClient.transcribeLecture(currentTitle, currentText)
+            if (responseText.isNotEmpty() && !responseText.contains("failed") && !responseText.contains("Error: ")) {
+                val updatedText = if (currentText.isEmpty()) {
+                    responseText
+                } else {
+                    "$currentText\n\n$responseText"
+                }
+                updateActiveNoteText(updatedText)
+            }
+            _lectureTranscribingActive.value = false
         }
     }
 
