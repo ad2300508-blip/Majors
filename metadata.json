@@ -1,0 +1,6 @@
+{
+  "name": "Student Workspace",
+  "description": "An all-in-one student note-taking app optimized for tablets with stylus support, Gemini handwriting-to-text recognition, and Google Drive syncing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
