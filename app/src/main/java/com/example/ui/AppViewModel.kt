@@ -10,6 +10,8 @@ import com.example.network.GoogleDriveClient
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -101,7 +103,11 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val strokesType = Types.newParameterizedType(List::class.java, DrawingStroke::class.java)
     private val strokesAdapter = moshi.adapter<List<DrawingStroke>>(strokesType)
 
+    private var flashcardCollectionJob: Job? = null
+    private var saveDebounceJob: Job? = null
+
     fun setActiveNote(noteId: Long?) {
+        flashcardCollectionJob?.cancel()
         viewModelScope.launch {
             _activeNoteId.value = noteId
             if (noteId != null) {
@@ -111,9 +117,10 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
                     _activeNoteText.value = note.textContent
                     _activeNoteCourseId.value = note.courseId
                     _activeNoteStrokes.value = strokesAdapter.fromJson(note.drawingsJson) ?: emptyList()
-                    // Fetch flashcards for this note
-                    repository.getFlashcardsByNote(noteId).collectLatest { flashcards ->
-                        _quizFlashcards.value = flashcards
+                    flashcardCollectionJob = viewModelScope.launch {
+                        repository.getFlashcardsByNote(noteId).collectLatest { flashcards ->
+                            _quizFlashcards.value = flashcards
+                        }
                     }
                 }
             } else {
@@ -148,16 +155,17 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
 
     private fun saveActiveNoteStateLocally() {
         val noteId = _activeNoteId.value ?: return
-        val currentTitle = _activeNoteTitle.value
-        val currentText = _activeNoteText.value
-        val currentCourseId = _activeNoteCourseId.value
-        val strokesJson = try {
-            strokesAdapter.toJson(_activeNoteStrokes.value)
-        } catch (e: Exception) {
-            "[]"
-        }
-
-        viewModelScope.launch {
+        saveDebounceJob?.cancel()
+        saveDebounceJob = viewModelScope.launch {
+            delay(400)
+            val currentTitle = _activeNoteTitle.value
+            val currentText = _activeNoteText.value
+            val currentCourseId = _activeNoteCourseId.value
+            val strokesJson = try {
+                strokesAdapter.toJson(_activeNoteStrokes.value)
+            } catch (e: Exception) {
+                "[]"
+            }
             val existing = repository.getNoteById(noteId)
             val updated = Note(
                 id = noteId,

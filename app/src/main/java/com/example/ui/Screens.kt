@@ -83,8 +83,12 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
+                    val todayFormatted = remember {
+                        java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.getDefault())
+                            .format(java.util.Date())
+                    }
                     Text(
-                        text = "Ready to conquer your classes today?",
+                        text = todayFormatted,
                         style = if (isTablet) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -261,7 +265,29 @@ fun DashboardScreen(
                                                 Spacer(modifier = Modifier.width(12.dp))
                                                 Column {
                                                     Text(assignment.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Text("Due: ${assignment.dueDate}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    val dueDateColor = remember(assignment.dueDate) {
+                                                        try {
+                                                            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                                                            val due = sdf.parse(assignment.dueDate)
+                                                            val now = java.util.Date()
+                                                            val diffMs = due!!.time - now.time
+                                                            val diffDays = diffMs / (1000 * 60 * 60 * 24)
+                                                            when {
+                                                                diffDays < 0 -> null // overdue = red
+                                                                diffDays <= 2 -> 1 // soon = orange
+                                                                else -> 2 // normal
+                                                            }
+                                                        } catch (e: Exception) { 2 }
+                                                    }
+                                                    Text(
+                                                        text = "Due: ${assignment.dueDate}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = when (dueDateColor) {
+                                                            null -> MaterialTheme.colorScheme.error
+                                                            1 -> Color(0xFFE65100)
+                                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                        }
+                                                    )
                                                 }
                                             }
                                         }
@@ -355,7 +381,29 @@ fun DashboardScreen(
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Column {
                                                     Text(assignment.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Text("Due: ${assignment.dueDate}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    val dueDateColor = remember(assignment.dueDate) {
+                                                        try {
+                                                            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                                                            val due = sdf.parse(assignment.dueDate)
+                                                            val now = java.util.Date()
+                                                            val diffMs = due!!.time - now.time
+                                                            val diffDays = diffMs / (1000 * 60 * 60 * 24)
+                                                            when {
+                                                                diffDays < 0 -> null // overdue = red
+                                                                diffDays <= 2 -> 1 // soon = orange
+                                                                else -> 2 // normal
+                                                            }
+                                                        } catch (e: Exception) { 2 }
+                                                    }
+                                                    Text(
+                                                        text = "Due: ${assignment.dueDate}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = when (dueDateColor) {
+                                                            null -> MaterialTheme.colorScheme.error
+                                                            1 -> Color(0xFFE65100)
+                                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                        }
+                                                    )
                                                 }
                                             }
                                         }
@@ -768,7 +816,29 @@ fun CoursesScreen(
                                                             fontWeight = FontWeight.SemiBold,
                                                             style = if (assignment.isCompleted) MaterialTheme.typography.bodyMedium.copy(color = Color.Gray) else MaterialTheme.typography.bodyMedium
                                                         )
-                                                        Text("Due: ${assignment.dueDate}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        val dueDateColor = remember(assignment.dueDate) {
+                                                            try {
+                                                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                                                                val due = sdf.parse(assignment.dueDate)
+                                                                val now = java.util.Date()
+                                                                val diffMs = due!!.time - now.time
+                                                                val diffDays = diffMs / (1000 * 60 * 60 * 24)
+                                                                when {
+                                                                    diffDays < 0 -> null // overdue = red
+                                                                    diffDays <= 2 -> 1 // soon = orange
+                                                                    else -> 2 // normal
+                                                                }
+                                                            } catch (e: Exception) { 2 }
+                                                        }
+                                                        Text(
+                                                            text = "Due: ${assignment.dueDate}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = when (dueDateColor) {
+                                                                null -> MaterialTheme.colorScheme.error
+                                                                1 -> Color(0xFFE65100)
+                                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                            }
+                                                        )
                                                     }
                                                 }
                                                 IconButton(onClick = { viewModel.deleteAssignment(assignment.id) }) {
@@ -884,7 +954,29 @@ fun CoursesScreen(
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            Text("Due: ${assignment.dueDate}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            val dueDateColor = remember(assignment.dueDate) {
+                                                try {
+                                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                                                    val due = sdf.parse(assignment.dueDate)
+                                                    val now = java.util.Date()
+                                                    val diffMs = due!!.time - now.time
+                                                    val diffDays = diffMs / (1000 * 60 * 60 * 24)
+                                                    when {
+                                                        diffDays < 0 -> null // overdue = red
+                                                        diffDays <= 2 -> 1 // soon = orange
+                                                        else -> 2 // normal
+                                                    }
+                                                } catch (e: Exception) { 2 }
+                                            }
+                                            Text(
+                                                text = "Due: ${assignment.dueDate}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = when (dueDateColor) {
+                                                    null -> MaterialTheme.colorScheme.error
+                                                    1 -> Color(0xFFE65100)
+                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
                                         }
                                     }
                                     IconButton(
@@ -1062,6 +1154,13 @@ fun FlashcardStudyScreen(
 
     var cardIndex by remember { mutableStateOf(0) }
     var flipStatus by remember { mutableStateOf(false) } // False: question, True: answer
+
+    LaunchedEffect(quizCards.size) {
+        if (quizCards.isNotEmpty() && cardIndex >= quizCards.size) {
+            cardIndex = quizCards.size - 1
+            flipStatus = false
+        }
+    }
 
     // Dynamic rotation for card flipping animation
     val cardRotation by animateFloatAsState(
@@ -1327,6 +1426,7 @@ fun SyncHubScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         Text("Google Ecosystem Cloud Hub", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
@@ -1372,7 +1472,7 @@ fun SyncHubScreen(
                             }
                         }
 
-                        VerticalDivider(Modifier.height(1.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                         Text("Set up real Access Token manual link below to trigger file sync operations instantly:")
                         OutlinedTextField(
