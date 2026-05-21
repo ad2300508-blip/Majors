@@ -46,6 +46,11 @@ fun DrawingCanvas(
     var offsetY by remember { mutableStateOf(0f) }
     var isPanMode by remember { mutableStateOf(false) }
 
+    val currentStrokes by rememberUpdatedState(strokes)
+    val currentSelectedColor by rememberUpdatedState(selectedColor)
+    val currentSelectedWidth by rememberUpdatedState(selectedWidth)
+    val currentIsEraser by rememberUpdatedState(isEraser)
+
     Box(
         modifier = modifier
             .background(Color.White) // High contrast drawing slate
@@ -53,7 +58,7 @@ fun DrawingCanvas(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(isEraser, selectedColor, selectedWidth, isPanMode, scale, offsetX, offsetY) {
+                .pointerInput(isPanMode, scale, offsetX, offsetY) {
                     if (isPanMode) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             scale = (scale * zoom).coerceIn(0.5f, 5.0f)
@@ -91,9 +96,9 @@ fun DrawingCanvas(
                             },
                             onDragEnd = {
                                 if (livePoints.isNotEmpty()) {
-                                    if (isEraser) {
+                                    if (currentIsEraser) {
                                         val eraserRadius = 30.0f / scale
-                                        val updated = strokes.filter { stroke ->
+                                        val updated = currentStrokes.filter { stroke ->
                                             stroke.points.none { pt ->
                                                 livePoints.any { lpt ->
                                                     val dx = pt.x - lpt.x
@@ -104,13 +109,13 @@ fun DrawingCanvas(
                                         }
                                         onStrokesChanged(updated)
                                     } else {
-                                        val strokeColor = selectedColor.value.toLong().toInt()
+                                        val strokeColor = currentSelectedColor.value.toLong().toInt()
                                         val stroke = DrawingStroke(
                                             points = livePoints.toList(),
                                             color = strokeColor,
-                                            width = selectedWidth
+                                            width = currentSelectedWidth
                                         )
-                                        onStrokesChanged(strokes + stroke)
+                                        onStrokesChanged(currentStrokes + stroke)
                                     }
                                 }
                                 livePoints.clear()

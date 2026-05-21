@@ -171,6 +171,14 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 16.dp))
 
             if (isTablet) {
+                WeeklyScheduleSection(
+                    courses = courses,
+                    onAddClassClick = { onNavigateToPage("courses") },
+                    isTablet = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Large screen dual layout (Recent Notes + Assignments)
                 Row(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -271,6 +279,12 @@ fun DashboardScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    WeeklyScheduleSection(
+                        courses = courses,
+                        onAddClassClick = { onNavigateToPage("courses") },
+                        isTablet = false
+                    )
+
                     // Recent Notes card block
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -1265,3 +1279,204 @@ fun SyncHubScreen(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WeeklyScheduleSection(
+    courses: List<Course>,
+    onAddClassClick: () -> Unit,
+    isTablet: Boolean
+) {
+    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+    val currentDayOfWeek = remember {
+        val calendar = java.util.Calendar.getInstance()
+        when (calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> "Monday"
+            java.util.Calendar.TUESDAY -> "Tuesday"
+            java.util.Calendar.WEDNESDAY -> "Wednesday"
+            java.util.Calendar.THURSDAY -> "Thursday"
+            java.util.Calendar.FRIDAY -> "Friday"
+            else -> "Monday"
+        }
+    }
+    var selectedDay by remember { mutableStateOf(currentDayOfWeek) }
+    
+    val dayCourses = courses.filter { isCourseDay(it.schedule, selectedDay) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+            .testTag("weekly_schedule_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Weekly Timetable", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Your class schedule by day of week", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(onClick = onAddClassClick) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Enroll Class", fontSize = 12.sp)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Weekday picker row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 12.dp else 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                days.forEach { day ->
+                    val isSelected = selectedDay == day
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary 
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            )
+                            .clickable { selectedDay = day }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isTablet) day else day.take(3),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (dayCourses.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(84.dp)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Assignment,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Research or offline study. No classes enrolled today.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    dayCourses.forEach { course ->
+                        val color = Color(android.graphics.Color.parseColor(course.colorHex))
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f)),
+                            border = BorderStroke(1.2.dp, color.copy(alpha = 0.35f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(color, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(course.code, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = course.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Lec: ${course.instructor}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        tint = color,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = course.schedule,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = color,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (dayCourses.size == 1 && isTablet) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun isCourseDay(scheduleStr: String, day: String): Boolean {
+    val s = scheduleStr.lowercase()
+    return when(day.lowercase()) {
+        "monday" -> s.contains("mon")
+        "tuesday" -> s.contains("tue")
+        "wednesday" -> s.contains("wed")
+        "thursday" -> s.contains("thu")
+        "friday" -> s.contains("fri")
+        else -> false
+    }
+}
+
