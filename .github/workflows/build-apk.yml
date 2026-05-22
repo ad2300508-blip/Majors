@@ -20,12 +20,10 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
-      - name: Install Gradle 8.14.3
-        run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.14.3-bin.zip -O /tmp/gradle.zip
-          unzip -q /tmp/gradle.zip -d /opt/gradle-dist
-          echo "/opt/gradle-dist/gradle-8.14.3/bin" >> $GITHUB_PATH
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Accept Android SDK licenses and install API 36
         run: |
@@ -46,7 +44,7 @@ jobs:
 
       - name: Build debug APK
         run: |
-          gradle assembleDebug \
+          ./gradlew assembleDebug \
             --no-daemon \
             --no-configuration-cache \
             -Dorg.gradle.jvmargs="-Xmx4g"
