@@ -80,6 +80,19 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
+    // App theme preference ("system" | "light" | "dark")
+    private val _themeMode = MutableStateFlow("system")
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+    fun setThemeMode(mode: String) { _themeMode.value = mode }
+
+    // Pomodoro configuration
+    private val _pomodoroWorkMins = MutableStateFlow(25)
+    val pomodoroWorkMins: StateFlow<Int> = _pomodoroWorkMins.asStateFlow()
+    private val _pomodoroBreakMins = MutableStateFlow(5)
+    val pomodoroBreakMins: StateFlow<Int> = _pomodoroBreakMins.asStateFlow()
+    fun setPomodoroWork(mins: Int) { _pomodoroWorkMins.value = mins }
+    fun setPomodoroBreak(mins: Int) { _pomodoroBreakMins.value = mins }
+
     // Flashcard generation state
     private val _flashcardGenerationActive = MutableStateFlow(false)
     val flashcardGenerationActive: StateFlow<Boolean> = _flashcardGenerationActive.asStateFlow()
@@ -412,9 +425,9 @@ class AppViewModel(private val repository: DatabaseRepository) : ViewModel() {
     }
 
     // Assignments Operations
-    fun addAssignment(title: String, dueDate: String, courseId: Long? = null, notes: String = "") {
+    fun addAssignment(title: String, dueDate: String, courseId: Long? = null, notes: String = "", priority: String = "medium") {
         viewModelScope.launch {
-            repository.insertAssignment(Assignment(courseId = courseId, title = title, dueDate = dueDate, notes = notes))
+            repository.insertAssignment(Assignment(courseId = courseId, title = title, dueDate = dueDate, notes = notes, priority = priority))
         }
     }
 

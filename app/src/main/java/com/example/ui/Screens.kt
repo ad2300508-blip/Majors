@@ -72,9 +72,11 @@ fun DashboardScreen(
     onNavigateToPage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val courses     by viewModel.courses.collectAsState()
-    val notes       by viewModel.notes.collectAsState()
-    val assignments by viewModel.assignments.collectAsState()
+    val courses          by viewModel.courses.collectAsState()
+    val notes            by viewModel.notes.collectAsState()
+    val assignments      by viewModel.assignments.collectAsState()
+    val pomodoroWorkMins by viewModel.pomodoroWorkMins.collectAsState()
+    val pomodoroBreakMins by viewModel.pomodoroBreakMins.collectAsState()
     val pending = assignments.filter { !it.isCompleted }
     var showAddCourseDialog by remember { mutableStateOf(false) }
 
@@ -123,12 +125,16 @@ fun DashboardScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 14.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 10.dp))
+
+            TodayFocusCard(pending = pending, courses = courses)
+
+            Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 10.dp))
 
             if (isTablet) {
                 // Pomodoro + Schedule side by side on tablet
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    PomodoroTimerCard(modifier = Modifier.width(220.dp))
+                    PomodoroTimerCard(workMins = pomodoroWorkMins, breakMins = pomodoroBreakMins, modifier = Modifier.width(240.dp))
                     WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = true, modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -137,15 +143,19 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     DashboardRecentNotesCard(notes = notes, courses = courses, viewModel = viewModel, onNavigate = onNavigateToPage, modifier = Modifier.weight(1.2f))
-                    DashboardPendingCard(pending = pending, courses = courses, modifier = Modifier.weight(1f))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        MiniCalendarCard(assignments = assignments, courses = courses)
+                        DashboardPendingCard(pending = pending, courses = courses)
+                    }
                 }
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    PomodoroTimerCard()
+                    PomodoroTimerCard(workMins = pomodoroWorkMins, breakMins = pomodoroBreakMins)
                     WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = false)
+                    MiniCalendarCard(assignments = assignments, courses = courses)
                     DashboardRecentNotesCard(notes = notes, courses = courses, viewModel = viewModel, onNavigate = onNavigateToPage)
                     DashboardPendingCard(pending = pending, courses = courses)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -334,6 +344,196 @@ private fun DashboardPendingCard(
 }
 
 @Composable
+private fun MiniCalendarCard(assignments: List<Assignment>, courses: List<Course>, modifier: Modifier = Modifier) {
+    val today = remember {
+        java.util.Calendar.getInstance().let {
+            Triple(it.get(java.util.Calendar.YEAR), it.get(java.util.Calendar.MONTH), it.get(java.util.Calendar.DAY_OF_MONTH))
+        }
+    }
+    var displayYear  by remember { mutableStateOf(today.first) }
+    var displayMonth by remember { mutableStateOf(today.second) }
+
+    val firstDayOfWeek = remember(displayYear, displayMonth) {
+        java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }
+            .get(java.util.Calendar.DAY_OF_WEEK) - 1
+    }
+    val daysInMonth = remember(displayYear, displayMonth) {
+        java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }
+            .getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    }
+    val monthLabel = remember(displayYear, displayMonth) {
+        java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(
+            java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }.time
+        )
+    }
+    val dayDots = remember(assignments, displayYear, displayMonth) {
+        val map = mutableMapOf<Int, List<String>>()
+        assignments.filter { !it.isCompleted }.forEach { a ->
+            runCatching {
+                val parts = a.dueDate.split("-")
+                val y = parts[0].toInt(); val m = parts[1].toInt() - 1; val d = parts[2].toInt()
+                if (y == displayYear && m == displayMonth) {
+                    val hex = courses.find { it.id == a.courseId }?.colorHex ?: "#1E88E5"
+                    map[d] = (map[d] ?: emptyList()) + hex
+                }
+            }
+        }
+        map
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    if (displayMonth == 0) { displayMonth = 11; displayYear-- } else displayMonth--
+                }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.ChevronLeft, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(monthLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = {
+                    if (displayMonth == 11) { displayMonth = 0; displayYear++ } else displayMonth++
+                }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("S","M","T","W","T","F","S").forEach { d ->
+                    Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            val rows = ((firstDayOfWeek + daysInMonth) + 6) / 7
+            repeat(rows) { row ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    repeat(7) { col ->
+                        val day = row * 7 + col - firstDayOfWeek + 1
+                        val isToday = day == today.third && displayMonth == today.second && displayYear == today.first
+                        val dots = dayDots[day]
+                        Box(modifier = Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+                            if (day in 1..daysInMonth) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                    Box(
+                                        modifier = Modifier.size(22.dp).background(
+                                            if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$day", style = MaterialTheme.typography.labelSmall,
+                                            color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
+                                    }
+                                    if (!dots.isNullOrEmpty()) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.height(5.dp)) {
+                                            dots.take(3).forEach { hex ->
+                                                Box(modifier = Modifier.size(4.dp).background(
+                                                    Color(android.graphics.Color.parseColor(hex)), CircleShape))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayFocusCard(pending: List<Assignment>, courses: List<Course>, modifier: Modifier = Modifier) {
+    val mostUrgent = remember(pending) {
+        pending.sortedWith(compareBy { dueDateUrgency(it.dueDate) }).firstOrNull()
+    }
+    val urgency = remember(mostUrgent) { mostUrgent?.let { dueDateUrgency(it.dueDate) } }
+    val isOverdue = urgency == 0
+    val containerColor = when {
+        isOverdue -> MaterialTheme.colorScheme.errorContainer
+        urgency == 1 -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer
+    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(
+                        if (mostUrgent == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else if (isOverdue) MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (mostUrgent == null) Icons.Default.CheckCircle else Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Today's Focus", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (mostUrgent == null) {
+                    Text("All caught up!", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("No pending assignments", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text(mostUrgent.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val course = courses.find { it.id == mostUrgent.courseId }
+                        Text(
+                            text = when (urgency) {
+                                0 -> "Overdue"
+                                1 -> "Due today"
+                                2 -> "Due tomorrow"
+                                else -> "Due ${mostUrgent.dueDate}"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (course != null) {
+                            Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                            Text(course.code, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            if (mostUrgent != null) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = (if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary).copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = when (urgency) {
+                            0 -> "!"
+                            1 -> "Today"
+                            2 -> "1 day"
+                            else -> "${urgency}d"
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AssignmentRow(assignment: Assignment, course: Course?, urgency: Int) {
     val courseColor = course?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) }
         ?: MaterialTheme.colorScheme.primary
@@ -442,19 +642,44 @@ fun NoteRowItem(note: Note, courses: List<Course>, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
+fun CoursesScreen(viewModel: AppViewModel, onNavigateToPage: (String) -> Unit = {}, modifier: Modifier = Modifier) {
     val courses     by viewModel.courses.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
     val notes       by viewModel.notes.collectAsState()
     val allGrades   by viewModel.allGrades.collectAsState()
 
+    var detailCourse            by remember { mutableStateOf<Course?>(null) }
     var showAddCourseDialog     by remember { mutableStateOf(false) }
     var showAddAssignmentDialog by remember { mutableStateOf(false) }
     var showAddGradeDialog      by remember { mutableStateOf(false) }
     var courseToDelete          by remember { mutableStateOf<Course?>(null) }
     var selectedTab             by remember { mutableStateOf(0) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    AnimatedContent(
+        targetState = detailCourse,
+        transitionSpec = {
+            if (targetState != null) {
+                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
+            } else {
+                slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+            }
+        },
+        modifier = modifier.fillMaxSize(),
+        label = "CourseNav"
+    ) { activeCourse ->
+    if (activeCourse != null) {
+        CourseDetailScreen(
+            course = activeCourse,
+            viewModel = viewModel,
+            onBack = { detailCourse = null },
+            onOpenNote = { noteId ->
+                viewModel.setActiveNote(noteId)
+                onNavigateToPage("notes")
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet = maxWidth > 720.dp
         val pad = if (isTablet) 24.dp else 16.dp
 
@@ -511,7 +736,8 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                         notes = notes,
                         isTablet = isTablet,
                         onAddCourse = { showAddCourseDialog = true },
-                        onDeleteCourse = { courseToDelete = it }
+                        onDeleteCourse = { courseToDelete = it },
+                        onCourseClick = { detailCourse = it }
                     )
                     1 -> GradeTrackerContent(
                         courses = courses,
@@ -539,8 +765,8 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
         if (showAddAssignmentDialog) {
-            AddAssignmentDialog(courses = courses, onDismiss = { showAddAssignmentDialog = false }, onConfirm = { title, due, courseId, assignNotes ->
-                viewModel.addAssignment(title, due, courseId, assignNotes)
+            AddAssignmentDialog(courses = courses, onDismiss = { showAddAssignmentDialog = false }, onConfirm = { title, due, courseId, assignNotes, priority ->
+                viewModel.addAssignment(title, due, courseId, assignNotes, priority)
                 showAddAssignmentDialog = false
             })
         }
@@ -569,6 +795,8 @@ fun CoursesScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
             )
         }
     }
+    } // else (no detailCourse)
+    } // AnimatedContent
 }
 
 @Composable
@@ -578,6 +806,7 @@ private fun CourseListContent(
     isTablet: Boolean,
     onAddCourse: () -> Unit,
     onDeleteCourse: (Course) -> Unit,
+    onCourseClick: (Course) -> Unit = {},
 ) {
     if (courses.isEmpty()) {
         CourseEmptyState(onAdd = onAddCourse)
@@ -591,13 +820,13 @@ private fun CourseListContent(
             contentPadding = PaddingValues(vertical = 14.dp)
         ) {
             items(courses) { course ->
-                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) })
+                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) }, onClick = { onCourseClick(course) })
             }
         }
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 14.dp)) {
             items(courses) { course ->
-                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) }, compact = true)
+                CourseCard(course = course, noteCount = notes.count { it.courseId == course.id }, onDelete = { onDeleteCourse(course) }, onClick = { onCourseClick(course) }, compact = true)
             }
         }
     }
@@ -805,11 +1034,196 @@ fun AddGradeDialog(
     )
 }
 
+// ─── Course Detail Screen ─────────────────────────────────────────────────────
+
 @Composable
-private fun CourseCard(course: Course, noteCount: Int, onDelete: () -> Unit, compact: Boolean = false) {
+fun CourseDetailScreen(
+    course: Course,
+    viewModel: AppViewModel,
+    onBack: () -> Unit,
+    onOpenNote: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val allNotes        by viewModel.notes.collectAsState()
+    val allGrades       by viewModel.allGrades.collectAsState()
+    val allAssignments  by viewModel.assignments.collectAsState()
+    val courses         by viewModel.courses.collectAsState()
+
+    val courseNotes       = remember(allNotes, course.id)       { allNotes.filter { it.courseId == course.id } }
+    val courseGrades      = remember(allGrades, course.id)      { allGrades.filter { it.courseId == course.id } }
+    val courseAssignments = remember(allAssignments, course.id) { allAssignments.filter { it.courseId == course.id } }
+
+    val courseColor = Color(android.graphics.Color.parseColor(course.colorHex))
+    var selectedTab         by remember { mutableStateOf(0) }
+    var showAddGradeDialog  by remember { mutableStateOf(false) }
+    var showAddAssignment   by remember { mutableStateOf(false) }
+
+    val gpa = remember(courseGrades) {
+        if (courseGrades.isEmpty()) null
+        else {
+            val weightedSum = courseGrades.sumOf { (it.score / it.maxScore * it.weight).toDouble() }
+            val totalWeight  = courseGrades.sumOf { it.weight.toDouble() }
+            if (totalWeight > 0) (weightedSum / totalWeight * 100).toFloat() else null
+        }
+    }
+
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+
+        // ── Gradient header ───────────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(courseColor, courseColor.copy(alpha = 0.65f)),
+                        start = Offset(0f, 0f),
+                        end = Offset(Float.MAX_VALUE, Float.MAX_VALUE)
+                    )
+                )
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.2f)) {
+                        Text(course.code, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(course.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2)
+                Spacer(Modifier.height(5.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(13.dp))
+                        Text(course.instructor, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(13.dp))
+                        Text(course.schedule, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CourseStatBubble("${courseNotes.size}", "Notes", Icons.Default.Description)
+                    CourseStatBubble("${courseGrades.size}", "Grades", Icons.Default.Grade)
+                    CourseStatBubble("${courseAssignments.count { !it.isCompleted }}", "Tasks", Icons.Default.Assignment)
+                    if (gpa != null) CourseStatBubble("${gpa.toInt()}%", "GPA", Icons.Default.Star)
+                }
+            }
+        }
+
+        // ── Tab bar ───────────────────────────────────────────────────────────
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = courseColor,
+            divider = {}
+        ) {
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 },
+                text = { Text("Notes", style = MaterialTheme.typography.labelLarge) },
+                icon = { Icon(Icons.Default.Description, null, modifier = Modifier.size(16.dp)) })
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 },
+                text = { Text("Grades", style = MaterialTheme.typography.labelLarge) },
+                icon = { Icon(Icons.Default.Grade, null, modifier = Modifier.size(16.dp)) })
+            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 },
+                text = { Text("Tasks", style = MaterialTheme.typography.labelLarge) },
+                icon = { Icon(Icons.Default.Assignment, null, modifier = Modifier.size(16.dp)) })
+        }
+
+        // ── Tab content + FAB ─────────────────────────────────────────────────
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (selectedTab) {
+                0 -> {
+                    if (courseNotes.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            EmptyStateMinimal(icon = Icons.Default.BorderColor, text = "No notes for this course yet")
+                        }
+                    } else {
+                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(courseNotes) { note ->
+                                NoteRowItem(note = note, courses = courses, onClick = { onOpenNote(note.id) })
+                            }
+                        }
+                    }
+                }
+                1 -> GradeTrackerContent(
+                    courses = listOf(course),
+                    allGrades = courseGrades,
+                    isTablet = false,
+                    onDeleteGrade = { viewModel.deleteGrade(it) }
+                )
+                2 -> {
+                    if (courseAssignments.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            EmptyStateMinimal(icon = Icons.Default.CheckCircle, text = "No tasks for this course")
+                        }
+                    } else {
+                        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(courseAssignments) { assignment ->
+                                val urgency = remember(assignment.dueDate) { dueDateUrgency(assignment.dueDate) }
+                                AssignmentListItem(
+                                    assignment = assignment, course = course, urgency = urgency,
+                                    onToggle = { viewModel.toggleAssignmentCompleted(assignment) },
+                                    onDelete = { viewModel.deleteAssignment(assignment.id) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (selectedTab == 1 || selectedTab == 2) {
+                FloatingActionButton(
+                    onClick = { if (selectedTab == 1) showAddGradeDialog = true else showAddAssignment = true },
+                    containerColor = courseColor,
+                    contentColor = Color.White,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
+                }
+            }
+        }
+    }
+
+    if (showAddGradeDialog) {
+        AddGradeDialog(courses = listOf(course), onDismiss = { showAddGradeDialog = false }, onConfirm = { cId, label, score, max, type, weight ->
+            viewModel.addGrade(cId, label, score, max, type, weight)
+            showAddGradeDialog = false
+        })
+    }
+    if (showAddAssignment) {
+        AddAssignmentDialog(courses = listOf(course), onDismiss = { showAddAssignment = false }, onConfirm = { title, due, cId, notes, priority ->
+            viewModel.addAssignment(title, due, cId, notes, priority)
+            showAddAssignment = false
+        })
+    }
+}
+
+@Composable
+private fun CourseStatBubble(value: String, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.2f)) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                Text(value, style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
+    }
+}
+
+@Composable
+private fun CourseCard(course: Course, noteCount: Int, onDelete: () -> Unit, onClick: () -> Unit = {}, compact: Boolean = false) {
     val color = Color(android.graphics.Color.parseColor(course.colorHex))
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -942,6 +1356,15 @@ fun AssignmentListItem(
                 }
             }
         }
+        if (assignment.priority == "high") {
+            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)) {
+                Text("HIGH", modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            }
+        } else if (assignment.priority == "low") {
+            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)) {
+                Text("LOW", modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+            }
+        }
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
         }
@@ -1001,11 +1424,12 @@ fun AddCourseDialog(onDismiss: () -> Unit, onConfirm: (String, String, String, S
 }
 
 @Composable
-fun AddAssignmentDialog(courses: List<Course>, onDismiss: () -> Unit, onConfirm: (String, String, Long?, String) -> Unit) {
+fun AddAssignmentDialog(courses: List<Course>, onDismiss: () -> Unit, onConfirm: (String, String, Long?, String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var selectedCourseId by remember { mutableStateOf<Long?>(null) }
+    var selectedPriority by remember { mutableStateOf("medium") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1015,6 +1439,16 @@ fun AddAssignmentDialog(courses: List<Course>, onDismiss: () -> Unit, onConfirm:
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = dueDate, onValueChange = { dueDate = it }, placeholder = { Text("YYYY-MM-DD") }, label = { Text("Due Date") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes (Optional)") }, modifier = Modifier.fillMaxWidth(), maxLines = 2)
+                Text("Priority", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("high" to "🔴 High", "medium" to "🟡 Medium", "low" to "🟢 Low").forEach { (value, label) ->
+                        FilterChip(
+                            selected = selectedPriority == value,
+                            onClick = { selectedPriority = value },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
                 if (courses.isNotEmpty()) {
                     Text("Link to Course", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     courses.forEach { course ->
@@ -1027,7 +1461,7 @@ fun AddAssignmentDialog(courses: List<Course>, onDismiss: () -> Unit, onConfirm:
                 }
             }
         },
-        confirmButton = { Button(onClick = { if (title.isNotEmpty()) onConfirm(title, dueDate, selectedCourseId, notes) }) { Text("Add") } },
+        confirmButton = { Button(onClick = { if (title.isNotEmpty()) onConfirm(title, dueDate, selectedCourseId, notes, selectedPriority) }) { Text("Add") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
@@ -1042,7 +1476,9 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
     val activeNoteId   by viewModel.activeNoteId.collectAsState()
     val generationActive by viewModel.flashcardGenerationActive.collectAsState()
 
-    val displayCards = if (activeNoteId != null) quizCards else allFlashcards
+    val baseCards  = if (activeNoteId != null) quizCards else allFlashcards
+    var shuffled   by remember { mutableStateOf(false) }
+    val displayCards = remember(baseCards, shuffled) { if (shuffled) baseCards.shuffled() else baseCards }
     var cardIndex  by remember { mutableStateOf(0) }
     var flipStatus by remember { mutableStateOf(false) }
     var correct    by remember { mutableStateOf(0) }
@@ -1081,6 +1517,16 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { shuffled = !shuffled; cardIndex = 0; flipStatus = false },
+                ) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
                 if (activeNoteId != null) {
                     FilledTonalButton(
                         onClick = { viewModel.generateAIStudyFlashcards() },
@@ -1096,6 +1542,7 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         }
                     }
                 }
+                } // Row wrapping shuffle + AI button
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -1287,18 +1734,82 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
 
 @Composable
 fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
-    val email     by viewModel.googleAccountEmail.collectAsState()
-    val syncState by viewModel.syncState.collectAsState()
-    val notes     by viewModel.notes.collectAsState()
+    val email          by viewModel.googleAccountEmail.collectAsState()
+    val syncState      by viewModel.syncState.collectAsState()
+    val notes          by viewModel.notes.collectAsState()
+    val themeMode      by viewModel.themeMode.collectAsState()
+    val workMins       by viewModel.pomodoroWorkMins.collectAsState()
+    val breakMins      by viewModel.pomodoroBreakMins.collectAsState()
     var tokenInput by remember { mutableStateOf("") }
     val syncedCount = notes.count { it.isSynced }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
 
-        Text("Cloud Sync Hub", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Backup notebooks securely to Google Drive.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
+        // ── Appearance ──────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Text("Theme", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (value, label) ->
+                        FilterChip(
+                            selected = themeMode == value,
+                            onClick = { viewModel.setThemeMode(value) },
+                            label = { Text(label) },
+                            leadingIcon = {
+                                Icon(
+                                    when (value) {
+                                        "light" -> Icons.Default.LightMode
+                                        "dark"  -> Icons.Default.DarkMode
+                                        else    -> Icons.Default.BrightnessAuto
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Study Timer ─────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Text("Study Timer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Text("Work session duration", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(15, 20, 25, 30, 45, 60).forEach { mins ->
+                        FilterChip(
+                            selected = workMins == mins,
+                            onClick = { viewModel.setPomodoroWork(mins) },
+                            label = { Text("${mins}m") }
+                        )
+                    }
+                }
+                Text("Break duration", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 15).forEach { mins ->
+                        FilterChip(
+                            selected = breakMins == mins,
+                            onClick = { viewModel.setPomodoroBreak(mins) },
+                            label = { Text("${mins}m") }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Cloud Sync ──────────────────────────────────────────────────────────
+        Text("Cloud Sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             if (maxWidth > 560.dp) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -1312,6 +1823,25 @@ fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
+
+        // ── About ───────────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+            Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    modifier = Modifier.size(48.dp).background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.School, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                }
+                Column {
+                    Text("ScholarSpace", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("v3.0 · Student Productivity Suite", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Powered by Gemini AI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -1416,13 +1946,13 @@ private fun SyncStatusCard(syncedCount: Int, total: Int, syncState: SyncState, m
 // ─── Pomodoro Timer ───────────────────────────────────────────────────────────
 
 @Composable
-fun PomodoroTimerCard(modifier: Modifier = Modifier) {
+fun PomodoroTimerCard(workMins: Int = 25, breakMins: Int = 5, modifier: Modifier = Modifier) {
     var ticking   by remember { mutableStateOf(false) }
     var isBreak   by remember { mutableStateOf(false) }
-    var secLeft   by remember { mutableStateOf(25 * 60) }
+    var secLeft   by remember(workMins) { mutableStateOf(workMins * 60) }
     var sessions  by remember { mutableStateOf(0) }
 
-    val totalSecs = if (isBreak) 5 * 60 else 25 * 60
+    val totalSecs = if (isBreak) breakMins * 60 else workMins * 60
     val progress  = secLeft.toFloat() / totalSecs
     val mm = secLeft / 60
     val ss = secLeft % 60
@@ -1439,7 +1969,7 @@ fun PomodoroTimerCard(modifier: Modifier = Modifier) {
         if (ticking && secLeft == 0) {
             if (!isBreak) sessions++
             isBreak = !isBreak
-            secLeft = if (isBreak) 5 * 60 else 25 * 60
+            secLeft = if (isBreak) breakMins * 60 else workMins * 60
         }
     }
 
@@ -1505,7 +2035,7 @@ fun PomodoroTimerCard(modifier: Modifier = Modifier) {
                     }
                     if (secLeft < totalSecs || isBreak) {
                         OutlinedButton(
-                            onClick = { ticking = false; isBreak = false; secLeft = 25 * 60 },
+                            onClick = { ticking = false; isBreak = false; secLeft = workMins * 60 },
                             modifier = Modifier.height(32.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp)
                         ) {

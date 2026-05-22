@@ -29,6 +29,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.data.*
 import com.example.ui.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -45,7 +46,7 @@ val NAV_ITEMS = listOf(
     NavItem("notes",      "Notebook",   Icons.Default.BorderColor,  "nav_notes"),
     NavItem("courses",    "Classes",    Icons.Default.Class,        "nav_courses"),
     NavItem("flashcards", "AI Quiz",    Icons.Default.AutoAwesome,  "nav_flashcards"),
-    NavItem("synchub",    "Sync",       Icons.Default.CloudSync,    "nav_sync"),
+    NavItem("synchub",    "Settings",   Icons.Default.Settings,     "nav_settings"),
 )
 
 class MainActivity : ComponentActivity() {
@@ -71,7 +72,13 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            val themeMode by viewModel.themeMode.collectAsState()
+            val darkTheme = when (themeMode) {
+                "dark"  -> true
+                "light" -> false
+                else    -> isSystemInDarkTheme()
+            }
+            MyApplicationTheme(darkTheme = darkTheme) {
                 MainAppLayout(viewModel = viewModel)
             }
         }
@@ -142,7 +149,7 @@ fun PageContent(page: String, viewModel: AppViewModel, onNavigate: (String) -> U
     when (page) {
         "dashboard"  -> DashboardScreen(viewModel = viewModel, onCreateNote = { viewModel.createNewNote(); onNavigate("notes") }, onNavigateToPage = onNavigate)
         "notes"      -> WorkspaceScreen(viewModel = viewModel)
-        "courses"    -> CoursesScreen(viewModel = viewModel)
+        "courses"    -> CoursesScreen(viewModel = viewModel, onNavigateToPage = onNavigate)
         "flashcards" -> FlashcardStudyScreen(viewModel = viewModel)
         "synchub"    -> SyncHubScreen(viewModel = viewModel)
     }

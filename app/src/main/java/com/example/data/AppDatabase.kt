@@ -109,9 +109,17 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+// ─── Migration v2 → v3 ────────────────────────────────────────────────────────
+// Adds priority column to assignments
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE assignments ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium'")
+    }
+}
+
 @Database(
     entities = [Course::class, Note::class, Assignment::class, Flashcard::class, Grade::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(DatabaseTypeConverters::class)
@@ -133,7 +141,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "student_workspace_db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance
