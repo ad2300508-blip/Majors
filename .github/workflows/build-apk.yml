@@ -20,20 +20,19 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Setup Gradle 8.14.3
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14.3'
+      - name: Install Gradle 8.14.3
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.14.3-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /opt/gradle-dist
+          echo "/opt/gradle-dist/gradle-8.14.3/bin" >> $GITHUB_PATH
 
       - name: Accept Android SDK licenses and install API 36
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "build-tools;35.0.0" > /dev/null 2>&1 || true
+            "build-tools;36.0.0" > /dev/null 2>&1 || true
 
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
