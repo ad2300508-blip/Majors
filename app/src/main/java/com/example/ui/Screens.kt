@@ -1662,7 +1662,7 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         }
                         Button(
                             onClick = { viewModel.markFlashcardReviewed(activeCard.id, true); correct++; total++; flipStatus = false; cardIndex = (cardIndex + 1) % displayCards.size },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -1677,16 +1677,16 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                     val scoreRatio = correct.toFloat() / total
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = if (scoreRatio >= 0.7f) Color(0xFF1B5E20) else MaterialTheme.colorScheme.surfaceVariant
+                        color = if (scoreRatio >= 0.7f) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(
                                 if (scoreRatio >= 0.7f) Icons.Default.EmojiEvents else Icons.Default.School,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = if (scoreRatio >= 0.7f) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (scoreRatio >= 0.7f) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text("$correct / $total correct · ${(scoreRatio * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = if (scoreRatio >= 0.7f) Color.White else MaterialTheme.colorScheme.onSurface)
+                            Text("$correct / $total correct · ${(scoreRatio * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = if (scoreRatio >= 0.7f) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -1976,7 +1976,7 @@ fun PomodoroTimerCard(workMins: Int = 25, breakMins: Int = 5, modifier: Modifier
     val ss = secLeft % 60
     val timeLabel = "%02d:%02d".format(mm, ss)
     val phaseLabel = if (isBreak) "Break" else "Focus"
-    val phaseColor = if (isBreak) Color(0xFF2E7D5A) else MaterialTheme.colorScheme.primary
+    val phaseColor = if (isBreak) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
 
     // Tick every second when running
     LaunchedEffect(ticking) {
