@@ -24,23 +24,11 @@ jobs:
 
       - name: Setup Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "=== Pre-installed platforms ==="
-          ls "$ANDROID_HOME/platforms/" 2>/dev/null || echo "(none)"
-
-          # Find sdkmanager regardless of cmdline-tools version
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -1)
-          echo "sdkmanager path: $SDKMANAGER"
-
           if [ -n "$SDKMANAGER" ]; then
             yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-            "$SDKMANAGER" "platforms;android-36" 2>&1 || true
-            # Let AGP pick the right build-tools; install fallback versions
-            "$SDKMANAGER" "build-tools;35.0.0" 2>&1 || true
+            "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" 2>&1 || true
           fi
-
-          echo "=== Platforms after install ==="
-          ls "$ANDROID_HOME/platforms/" 2>/dev/null || echo "(none)"
 
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
