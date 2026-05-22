@@ -162,80 +162,173 @@ fun TabletSidebar(
     viewModel: AppViewModel,
 ) {
     val email by viewModel.googleAccountEmail.collectAsState()
+    val courses by viewModel.courses.collectAsState()
 
     Column(
         modifier = Modifier
-            .width(260.dp)
+            .width(240.dp)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 24.dp),
+            .padding(horizontal = 14.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.Start
     ) {
-        // Brand header
+        // Brand
         Row(
-            modifier = Modifier.padding(start = 8.dp, bottom = 32.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(start = 10.dp, bottom = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-                        ),
-                        RoundedCornerShape(12.dp)
-                    ),
+                    .size(32.dp)
+                    .background(MaterialTheme.colorScheme.onBackground, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.School, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Text(
+                    "M",
+                    color = MaterialTheme.colorScheme.background,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black
+                )
             }
-            Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text("ScholarSpace", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("Study OS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Majors", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "STUDY OS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 9.sp,
+                    letterSpacing = 0.12.sp
+                )
             }
         }
 
-        // Nav items
-        NAV_ITEMS.forEach { item ->
+        // WORKSPACE section
+        Text(
+            "WORKSPACE",
+            modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.sp,
+            letterSpacing = 0.12.sp
+        )
+        NAV_ITEMS.take(4).forEach { item ->
             SidebarNavItem(
                 item = item,
                 selected = currentPage == item.id,
                 onClick = { onNavigate(item.id) },
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // LIBRARY section — show courses as colored dot items
+        Text(
+            "LIBRARY",
+            modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.sp,
+            letterSpacing = 0.12.sp
+        )
+        courses.take(5).forEach { course ->
+            val courseColor = try {
+                Color(android.graphics.Color.parseColor(course.colorHex))
+            } catch (e: Exception) {
+                MaterialTheme.colorScheme.primary
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onNavigate("courses") }
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(courseColor, RoundedCornerShape(3.dp))
+                )
+                Text(
+                    course.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    fontSize = 13.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(1.dp))
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // Settings nav item
+        SidebarNavItem(
+            item = NAV_ITEMS.last(),
+            selected = currentPage == NAV_ITEMS.last().id,
+            onClick = { onNavigate(NAV_ITEMS.last().id) },
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Account footer
         Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.background,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Avatar with gradient
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(30.dp)
                         .background(
-                            if (email.isNotEmpty()) Color(0xFF1B5E20) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            Brush.linearGradient(
+                                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                            ),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        if (email.isNotEmpty()) Icons.Default.CloudDone else Icons.Default.OfflineBolt,
-                        contentDescription = null,
-                        tint = if (email.isNotEmpty()) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    Text(
+                        "MV",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(if (email.isNotEmpty()) "Connected" else "Local Only", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Text(email.ifEmpty { "Offline Storage" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (email.isNotEmpty()) "Connected" else "Local Only",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        email.ifEmpty { "Offline storage" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        fontSize = 10.sp
+                    )
                 }
+                // Sync dot
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            if (email.isNotEmpty()) Color(0xFF4A8053) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            CircleShape
+                        )
+                )
             }
         }
     }
@@ -244,45 +337,49 @@ fun TabletSidebar(
 @Composable
 fun SidebarNavItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
     val bgColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else Color.Transparent,
-        animationSpec = tween(200),
+        targetValue = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        animationSpec = tween(180),
         label = "SidebarBg"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(200),
+        targetValue = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(180),
         label = "SidebarFg"
     )
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(bgColor)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 14.dp)
-            .testTag(item.tag),
-        verticalAlignment = Alignment.CenterVertically
+            .testTag(item.tag)
     ) {
-        // Left accent line for selected
-        Box(
-            modifier = Modifier
-                .width(3.dp)
-                .height(24.dp)
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    RoundedCornerShape(2.dp)
-                )
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Icon(item.icon, contentDescription = item.label, tint = contentColor, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = item.label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = contentColor
-        )
+        // Left accent bar
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(18.dp)
+                    .align(Alignment.CenterStart)
+                    .offset(x = (-14).dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+            )
+        }
+        Row(
+            modifier = Modifier.padding(vertical = 9.dp, horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(item.icon, contentDescription = item.label, tint = contentColor, modifier = Modifier.size(18.dp))
+            Text(
+                text = item.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = contentColor,
+                fontSize = 14.sp
+            )
+        }
     }
 }
 

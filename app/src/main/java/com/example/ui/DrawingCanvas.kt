@@ -49,8 +49,7 @@ fun DrawingCanvas(
     val currentSelectedWidth by rememberUpdatedState(selectedWidth)
     val currentIsEraser by rememberUpdatedState(isEraser)
 
-    // Slightly warm off-white paper background
-    val paperColor = Color(0xFFFBFBFF)
+    val paperColor = MaterialTheme.colorScheme.background
 
     Box(modifier = modifier.background(paperColor)) {
         Canvas(

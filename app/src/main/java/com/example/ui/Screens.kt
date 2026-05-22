@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,7 +94,7 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(pad))
 
             // ── Hero banner ───────────────────────────────────────────────────
-            DashboardHeroBanner(isTablet = isTablet, onCreateNote = onCreateNote)
+            DashboardHeroBanner(isTablet = isTablet, onCreateNote = onCreateNote, courses = courses, pending = pending)
 
             Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 14.dp))
 
@@ -173,70 +175,133 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun DashboardHeroBanner(isTablet: Boolean, onCreateNote: () -> Unit) {
+private fun DashboardHeroBanner(
+    isTablet: Boolean,
+    onCreateNote: () -> Unit,
+    courses: List<Course> = emptyList(),
+    pending: List<Assignment> = emptyList(),
+) {
     val todayFormatted = remember {
-        java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date())
+        java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.getDefault()).format(java.util.Date())
     }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (isTablet) 160.dp else 130.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    0f to Color(0xFF1A1F60),
-                    0.55f to Color(0xFF3D5AFE),
-                    1f to Color(0xFF6B3FD6),
-                )
-            )
+    val greeting = remember {
+        val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        when { h < 12 -> "Good morning"; h < 18 -> "Good afternoon"; else -> "Good evening" }
+    }
+    val classCount = courses.size
+    val dueCount   = pending.size
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        tonalElevation = 0.dp
     ) {
-        // subtle decorative circle
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .offset(x = (-30).dp, y = (-40).dp)
-                .background(Color.White.copy(alpha = 0.05f), CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 20.dp, y = 30.dp)
-                .background(Color.White.copy(alpha = 0.04f), CircleShape)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    "Welcome Back, Scholar",
-                    style = if (isTablet) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+        Box {
+            // Subtle radial colour accents on paper
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF4955D5).copy(alpha = 0.07f), Color.Transparent),
+                        center = Offset(0f, 0f), radius = size.width * 0.65f
+                    ), radius = size.width * 0.65f, center = Offset(0f, 0f)
                 )
-                Text(
-                    todayFormatted,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.75f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFC08B0C).copy(alpha = 0.07f), Color.Transparent),
+                        center = Offset(size.width, size.height), radius = size.width * 0.5f
+                    ), radius = size.width * 0.5f, center = Offset(size.width, size.height)
                 )
             }
-            Button(
-                onClick = onCreateNote,
-                modifier = Modifier.testTag("dashboard_new_note_button"),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.18f),
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(if (isTablet) "Quick S-Pen Note" else "New Note", fontWeight = FontWeight.SemiBold)
+
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp)) {
+                // Date label
+                Text(
+                    todayFormatted.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.12.sp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Serif-style greeting with accent-coloured italics
+                val accentColor = MaterialTheme.colorScheme.primary
+                val bodyColor   = MaterialTheme.colorScheme.onSurface
+                val styledText = buildAnnotatedString {
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = bodyColor)) { append("$greeting. You have ") }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = accentColor, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) {
+                        append("$classCount ${if (classCount == 1) "class" else "classes"}")
+                    }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = bodyColor)) { append(" and ") }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = accentColor, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) {
+                        append("$dueCount ${if (dueCount == 1) "deadline" else "deadlines"}")
+                    }
+                    withStyle(androidx.compose.ui.text.SpanStyle(color = bodyColor)) { append(" today.") }
+                }
+                Text(
+                    text = styledText,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = if (isTablet) 28.sp else 22.sp,
+                        lineHeight  = if (isTablet) 36.sp else 30.sp
+                    ),
+                    fontWeight = FontWeight.Normal,
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Stats strip
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                ) {
+                    HeroStatCell("12", "h 24m", "Study this week", "+18% vs. last", Modifier.weight(1f))
+                    VerticalDivider(modifier = Modifier.height(80.dp).align(Alignment.CenterVertically), thickness = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                    HeroStatCell("94", "/142", "Cards mastered", "32 due today", Modifier.weight(1f), trendColor = MaterialTheme.colorScheme.primary)
+                    VerticalDivider(modifier = Modifier.height(80.dp).align(Alignment.CenterVertically), thickness = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                    HeroStatCell("14", "day", "Streak", "Keep it going", Modifier.weight(1f), trendColor = MaterialTheme.colorScheme.secondary)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onCreateNote,
+                    modifier = Modifier.testTag("dashboard_new_note_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("New note", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun HeroStatCell(
+    bigNum: String,
+    unit: String,
+    label: String,
+    trend: String,
+    modifier: Modifier,
+    trendColor: Color = Color(0xFF4A8053),
+) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Baseline, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(bigNum, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, fontSize = 28.sp, lineHeight = 28.sp)
+            Text(unit, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.06.sp, lineHeight = 14.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(trend, style = MaterialTheme.typography.labelSmall, color = trendColor)
     }
 }
 
@@ -928,14 +993,14 @@ fun GradeTrackerContent(
 
 @Composable
 private fun GpaChip(percentage: Float, letterGrade: String) {
-    val color = when {
-        percentage >= 90f -> Color(0xFF2E7D32)
-        percentage >= 80f -> Color(0xFF1565C0)
-        percentage >= 70f -> Color(0xFFF57C00)
-        percentage >= 60f -> Color(0xFFE65100)
-        else              -> MaterialTheme.colorScheme.error
+    val (color, bgColor) = when {
+        percentage >= 90f -> MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.tertiaryContainer
+        percentage >= 80f -> MaterialTheme.colorScheme.primary  to MaterialTheme.colorScheme.primaryContainer
+        percentage >= 70f -> Color(0xFFC08B0C)                  to Color(0xFFFFF3D6)
+        percentage >= 60f -> Color(0xFFD14B3D)                  to Color(0xFFFFE4E1)
+        else              -> MaterialTheme.colorScheme.error     to MaterialTheme.colorScheme.errorContainer
     }
-    Surface(shape = RoundedCornerShape(8.dp), color = color.copy(alpha = 0.15f)) {
+    Surface(shape = RoundedCornerShape(8.dp), color = bgColor) {
         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(letterGrade, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = color)
             Text("${"%.1f".format(percentage)}%", style = MaterialTheme.typography.labelSmall, color = color)
@@ -946,10 +1011,10 @@ private fun GpaChip(percentage: Float, letterGrade: String) {
 @Composable
 private fun GradeRow(grade: Grade, onDelete: () -> Unit) {
     val typeColor = when (grade.type) {
-        "exam"     -> Color(0xFF1565C0)
-        "quiz"     -> Color(0xFF6A1B9A)
-        "homework" -> Color(0xFF2E7D32)
-        "project"  -> Color(0xFFF57C00)
+        "exam"     -> MaterialTheme.colorScheme.primary
+        "quiz"     -> MaterialTheme.colorScheme.secondary
+        "homework" -> MaterialTheme.colorScheme.tertiary
+        "project"  -> Color(0xFFC08B0C)
         else       -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Row(
@@ -1222,44 +1287,40 @@ private fun CourseStatBubble(value: String, label: String, icon: androidx.compos
 @Composable
 private fun CourseCard(course: Course, noteCount: Int, onDelete: () -> Unit, onClick: () -> Unit = {}, compact: Boolean = false) {
     val color = Color(android.graphics.Color.parseColor(course.colorHex))
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
+        tonalElevation = 1.dp
     ) {
-        Column {
-            // Color header strip
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .background(color)
-            )
-            Column(modifier = Modifier.padding(14.dp)) {
+        Box {
+            // Subtle tinted wash from course color
+            Box(modifier = Modifier.matchParentSize().background(
+                Brush.linearGradient(listOf(color.copy(alpha = 0.06f), Color.Transparent))
+            ))
+            // Ribbon at top
+            Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(color).align(Alignment.TopStart))
+            Column(modifier = Modifier.padding(start = 16.dp, end = 10.dp, top = 16.dp, bottom = 14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = color.copy(alpha = 0.15f)) {
-                        Text(course.code, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.Bold)
-                    }
+                    Text(course.code, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.4f), modifier = Modifier.size(15.dp))
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(course.name, style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(course.name, style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(course.instructor, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                        Spacer(modifier = Modifier.width(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                         Text(course.schedule, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(13.dp), tint = color.copy(alpha = 0.8f))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("$noteCount note${if (noteCount != 1) "s" else ""}", style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.9f), fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(12.dp), tint = color.copy(alpha = 0.7f))
+                        Text("$noteCount", style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -1589,7 +1650,7 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         .clip(RoundedCornerShape(20.dp))
                         .background(
                             if (cardRotation > 90f)
-                                Brush.linearGradient(listOf(Color(0xFF1E2D8B), Color(0xFF3D5AFE)))
+                                Brush.linearGradient(listOf(MaterialTheme.colorScheme.onBackground, MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f)))
                             else
                                 Brush.linearGradient(listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant))
                         )
@@ -1649,24 +1710,35 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                     }
                 }
 
-                // Reveal answer buttons
+                // Spaced-repetition rating buttons (shown after flip)
                 AnimatedVisibility(visible = flipStatus, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                    Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = { viewModel.markFlashcardReviewed(activeCard.id, false); total++; flipStatus = false; cardIndex = (cardIndex + 1) % displayCards.size },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Missed it")
-                        }
-                        Button(
-                            onClick = { viewModel.markFlashcardReviewed(activeCard.id, true); correct++; total++; flipStatus = false; cardIndex = (cardIndex + 1) % displayCards.size },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Knew it!")
+                    val ratingItems = listOf(
+                        Triple("1", "Again", MaterialTheme.colorScheme.error),
+                        Triple("2", "Hard",  Color(0xFFC08B0C)),
+                        Triple("3", "Good",  MaterialTheme.colorScheme.primary),
+                        Triple("4", "Easy",  MaterialTheme.colorScheme.tertiary),
+                    )
+                    Row(modifier = Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ratingItems.forEachIndexed { i, (key, label, color) ->
+                            OutlinedButton(
+                                onClick = {
+                                    val knew = i >= 2
+                                    viewModel.markFlashcardReviewed(activeCard.id, knew)
+                                    if (knew) correct++
+                                    total++
+                                    flipStatus = false
+                                    cardIndex = (cardIndex + 1) % displayCards.size
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.45f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = color)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(key, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+                                    Text(label, style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.8f))
+                                }
+                            }
                         }
                     }
                 }
@@ -1745,21 +1817,16 @@ fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(0.dp)) {
 
-        // Settings banner
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .background(
-                    Brush.linearGradient(
-                        0f to Color(0xFF1A1F60),
-                        1f to Color(0xFF6B3FD6),
-                    )
-                )
-                .padding(24.dp),
-            contentAlignment = Alignment.BottomStart
+        // Topbar
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Column {
+                Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("ACCOUNT · SYNC · APPEARANCE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.1.sp)
+            }
         }
 
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
