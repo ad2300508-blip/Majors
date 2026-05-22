@@ -184,9 +184,9 @@ private fun DashboardHeroBanner(isTablet: Boolean, onCreateNote: () -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.linearGradient(
-                    0f to Color(0xFF1A3A8F),
-                    0.6f to Color(0xFF2A52BE),
-                    1f to Color(0xFF1A7A6E),
+                    0f to Color(0xFF1A1F60),
+                    0.55f to Color(0xFF3D5AFE),
+                    1f to Color(0xFF6B3FD6),
                 )
             )
     ) {
@@ -1589,7 +1589,7 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         .clip(RoundedCornerShape(20.dp))
                         .background(
                             if (cardRotation > 90f)
-                                Brush.linearGradient(listOf(Color(0xFF0A2E9E), Color(0xFF1A3A8F)))
+                                Brush.linearGradient(listOf(Color(0xFF1E2D8B), Color(0xFF3D5AFE)))
                             else
                                 Brush.linearGradient(listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant))
                         )
@@ -1743,9 +1743,26 @@ fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
     var tokenInput by remember { mutableStateOf("") }
     val syncedCount = notes.count { it.isSynced }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(0.dp)) {
 
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        // Settings banner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .background(
+                    Brush.linearGradient(
+                        0f to Color(0xFF1A1F60),
+                        1f to Color(0xFF6B3FD6),
+                    )
+                )
+                .padding(24.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
 
         // ── Appearance ──────────────────────────────────────────────────────────
         Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(1.dp)) {
@@ -1842,6 +1859,7 @@ fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
         }
 
         Spacer(modifier = Modifier.height(8.dp))
+        } // inner padding Column
     }
 }
 

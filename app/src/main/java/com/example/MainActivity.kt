@@ -181,7 +181,7 @@ fun TabletSidebar(
                     .size(40.dp)
                     .background(
                         Brush.linearGradient(
-                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                         ),
                         RoundedCornerShape(12.dp)
                     ),
