@@ -30,11 +30,16 @@ jobs:
       - name: Accept Android SDK licenses and install API 36
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "build-tools;35.0.0" > /dev/null 2>&1 || true
+
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Decode debug keystore
-        run: |
-          base64 --decode debug.keystore.base64 > debug.keystore
+        run: base64 --decode debug.keystore.base64 > debug.keystore
 
       - name: Create .env with placeholder API key
         run: |
@@ -46,8 +51,6 @@ jobs:
             --no-daemon \
             --no-configuration-cache \
             -Dorg.gradle.jvmargs="-Xmx4g"
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -60,6 +63,6 @@ jobs:
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
           if [ -f "$APK" ]; then
-            echo "✅ Build succeeded!"
+            echo "Build succeeded!"
             ls -lh "$APK"
           fi
