@@ -22,12 +22,20 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Accept Android SDK licenses and install API 36
+      - name: Install Android SDK API 36
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-36" \
-            "build-tools;36.0.0" > /dev/null 2>&1 || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          # Find sdkmanager regardless of cmdline-tools version
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -1)
+          echo "sdkmanager: $SDKMANAGER"
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+            "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+          else
+            echo "sdkmanager not found — skipping SDK install"
+          fi
+          echo "Installed platforms:"
+          ls "$ANDROID_HOME/platforms/" 2>/dev/null || echo "(none)"
 
       - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
