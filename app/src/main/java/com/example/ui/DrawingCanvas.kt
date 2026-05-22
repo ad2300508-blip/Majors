@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -41,7 +39,6 @@ fun DrawingCanvas(
 ) {
     val livePoints = remember { mutableStateListOf<StylusPoint>() }
 
-    // Viewport scaling and translation panning track
     var scale by remember { mutableStateOf(1.0f) }
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
@@ -52,10 +49,10 @@ fun DrawingCanvas(
     val currentSelectedWidth by rememberUpdatedState(selectedWidth)
     val currentIsEraser by rememberUpdatedState(isEraser)
 
-    Box(
-        modifier = modifier
-            .background(Color.White) // High contrast drawing slate
-    ) {
+    // Slightly warm off-white paper background
+    val paperColor = Color(0xFFFBFBFF)
+
+    Box(modifier = modifier.background(paperColor)) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,7 +76,7 @@ fun DrawingCanvas(
                                 val offset = change.position
                                 val worldX = (offset.x - offsetX) / scale
                                 val worldY = (offset.y - offsetY) / scale
-                                
+
                                 var pressure = change.pressure
                                 if (pressure == 1.0f || pressure == 0f) {
                                     val lastPoint = livePoints.lastOrNull()
@@ -87,9 +84,8 @@ fun DrawingCanvas(
                                         val dx = worldX - lastPoint.x
                                         val dy = worldY - lastPoint.y
                                         val dist = sqrt(dx * dx + dy * dy)
-                                        val maxDist = 30f
-                                        val speedFactor = (dist / maxDist).coerceIn(0f, 1f)
-                                        val targetPressure = 1.3f - (speedFactor * 0.8f) // faster speed -> thinner stroke
+                                        val speedFactor = (dist / 30f).coerceIn(0f, 1f)
+                                        val targetPressure = 1.3f - (speedFactor * 0.8f)
                                         pressure = lastPoint.pressure * 0.7f + targetPressure * 0.3f
                                     }
                                 }
@@ -111,10 +107,9 @@ fun DrawingCanvas(
                                         onStrokesChanged(updated)
                                         livePoints.clear()
                                     } else {
-                                        val strokeColor = currentSelectedColor.toArgb()
                                         val stroke = DrawingStroke(
                                             points = livePoints.toList(),
-                                            color = strokeColor,
+                                            color = currentSelectedColor.toArgb(),
                                             width = currentSelectedWidth
                                         )
                                         onStrokesChanged(currentStrokes + stroke)
@@ -124,299 +119,210 @@ fun DrawingCanvas(
                             },
                             onDragCancel = {
                                 if (livePoints.isNotEmpty() && !currentIsEraser) {
-                                    val strokeColor = currentSelectedColor.toArgb()
                                     val stroke = DrawingStroke(
                                         points = livePoints.toList(),
-                                        color = strokeColor,
+                                        color = currentSelectedColor.toArgb(),
                                         width = currentSelectedWidth
                                     )
                                     onStrokesChanged(currentStrokes + stroke)
-                                    livePoints.clear()
-                                } else {
-                                    livePoints.clear()
                                 }
+                                livePoints.clear()
                             }
                         )
                     }
                 }
         ) {
-            // Apply scale and panning values onto drawing space
             withTransform({
                 translate(offsetX, offsetY)
                 scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero)
             }) {
-                // Guiding backgrounds scaled up dynamically to a massive visual sheet bounding box
+                val bgRange = -4000f..8000f
                 when (backgroundStyle) {
                     "ruled" -> {
                         val spacing = 28.dp.toPx()
-                        val startY = -4000f
-                        val endY = 8000f
-                        val startX = -4000f
-                        val endX = 8000f
-                        
-                        var y = (startY / spacing).toInt() * spacing
-                        while (y < endY) {
+                        var y = (bgRange.start / spacing).toInt() * spacing
+                        while (y < bgRange.endInclusive) {
                             drawLine(
-                                color = Color(0xFF03A9F4).copy(alpha = 0.15f), // Classic notebook blue lines
-                                start = androidx.compose.ui.geometry.Offset(startX, y),
-                                end = androidx.compose.ui.geometry.Offset(endX, y),
-                                strokeWidth = 1.5.dp.toPx()
+                                color = Color(0xFF90CAF9).copy(alpha = 0.30f),
+                                start = androidx.compose.ui.geometry.Offset(bgRange.start, y),
+                                end = androidx.compose.ui.geometry.Offset(bgRange.endInclusive, y),
+                                strokeWidth = 1.2.dp.toPx()
                             )
                             y += spacing
                         }
-                        
-                        // Notebook red margin indicator line
-                        val marginX = 64.dp.toPx()
+                        // Red margin line
                         drawLine(
-                            color = Color(0xFFE91E63).copy(alpha = 0.2f),
-                            start = androidx.compose.ui.geometry.Offset(marginX, startY),
-                            end = androidx.compose.ui.geometry.Offset(marginX, endY),
-                            strokeWidth = 2.dp.toPx()
+                            color = Color(0xFFEF9A9A).copy(alpha = 0.35f),
+                            start = androidx.compose.ui.geometry.Offset(60.dp.toPx(), bgRange.start),
+                            end = androidx.compose.ui.geometry.Offset(60.dp.toPx(), bgRange.endInclusive),
+                            strokeWidth = 1.5.dp.toPx()
                         )
                     }
                     "grid" -> {
-                        val spacing = 22.dp.toPx()
-                        val startY = -4000f
-                        val endY = 8000f
-                        val startX = -4000f
-                        val endX = 8000f
-                        
-                        var y = (startY / spacing).toInt() * spacing
-                        while (y < endY) {
+                        val spacing = 24.dp.toPx()
+                        var y = (bgRange.start / spacing).toInt() * spacing
+                        while (y < bgRange.endInclusive) {
                             drawLine(
-                                color = Color(0xFF9E9E9E).copy(alpha = 0.12f),
-                                start = androidx.compose.ui.geometry.Offset(startX, y),
-                                end = androidx.compose.ui.geometry.Offset(endX, y),
-                                strokeWidth = 1.dp.toPx()
+                                color = Color(0xFF9E9E9E).copy(alpha = 0.15f),
+                                start = androidx.compose.ui.geometry.Offset(bgRange.start, y),
+                                end = androidx.compose.ui.geometry.Offset(bgRange.endInclusive, y),
+                                strokeWidth = 0.8.dp.toPx()
                             )
                             y += spacing
                         }
-                        
-                        var x = (startX / spacing).toInt() * spacing
-                        while (x < endX) {
+                        var x = (bgRange.start / spacing).toInt() * spacing
+                        while (x < bgRange.endInclusive) {
                             drawLine(
-                                color = Color(0xFF9E9E9E).copy(alpha = 0.12f),
-                                start = androidx.compose.ui.geometry.Offset(x, startY),
-                                end = androidx.compose.ui.geometry.Offset(x, endY),
-                                strokeWidth = 1.dp.toPx()
+                                color = Color(0xFF9E9E9E).copy(alpha = 0.15f),
+                                start = androidx.compose.ui.geometry.Offset(x, bgRange.start),
+                                end = androidx.compose.ui.geometry.Offset(x, bgRange.endInclusive),
+                                strokeWidth = 0.8.dp.toPx()
                             )
                             x += spacing
                         }
                     }
-                    else -> { /* Blank canvas slate */ }
+                    "dotted" -> {
+                        val spacing = 24.dp.toPx()
+                        val dotRadius = 1.2.dp.toPx()
+                        var y = (bgRange.start / spacing).toInt() * spacing
+                        while (y < bgRange.endInclusive) {
+                            var x = (bgRange.start / spacing).toInt() * spacing
+                            while (x < bgRange.endInclusive) {
+                                drawCircle(
+                                    color = Color(0xFF9E9E9E).copy(alpha = 0.35f),
+                                    radius = dotRadius,
+                                    center = androidx.compose.ui.geometry.Offset(x, y)
+                                )
+                                x += spacing
+                            }
+                            y += spacing
+                        }
+                    }
+                    else -> { /* blank */ }
                 }
 
-                // Render vector strokes applying styling brush rules
+                // Committed strokes
                 strokes.forEach { stroke ->
                     if (stroke.points.size > 1) {
                         val colorVal = Color(stroke.color)
                         val isHighlighter = colorVal.alpha < 0.9f
 
                         if (isHighlighter) {
-                            // Highlighters are painted with uniform alpha via smoothed Bezier path strokes
                             val path = Path().apply {
                                 val first = stroke.points.first()
                                 moveTo(first.x, first.y)
-                                var prevPt = first
+                                var prev = first
                                 for (i in 1 until stroke.points.size) {
                                     val pt = stroke.points[i]
-                                    val midX = (prevPt.x + pt.x) / 2f
-                                    val midY = (prevPt.y + pt.y) / 2f
-                                    if (i == 1) {
-                                        lineTo(midX, midY)
-                                    } else {
-                                        quadraticTo(prevPt.x, prevPt.y, midX, midY)
-                                    }
-                                    prevPt = pt
+                                    val midX = (prev.x + pt.x) / 2f
+                                    val midY = (prev.y + pt.y) / 2f
+                                    if (i == 1) lineTo(midX, midY) else quadraticTo(prev.x, prev.y, midX, midY)
+                                    prev = pt
                                 }
-                                lineTo(prevPt.x, prevPt.y)
+                                lineTo(stroke.points.last().x, stroke.points.last().y)
                             }
-                            drawPath(
-                                path = path,
-                                color = colorVal,
-                                style = Stroke(
-                                    width = stroke.width,
-                                    cap = StrokeCap.Round,
-                                    join = StrokeJoin.Round
-                                )
-                            )
+                            drawPath(path, colorVal, style = Stroke(stroke.width, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         } else {
-                            // Ink fountain pens and graphite draw seamless velocity-tapered segment lines
                             for (i in 0 until stroke.points.size - 1) {
                                 val p1 = stroke.points[i]
                                 val p2 = stroke.points[i + 1]
-                                val segWidth = stroke.width * ((p1.pressure + p2.pressure) / 2f)
                                 drawLine(
-                                    color = colorVal,
-                                    start = androidx.compose.ui.geometry.Offset(p1.x, p1.y),
-                                    end = androidx.compose.ui.geometry.Offset(p2.x, p2.y),
-                                    strokeWidth = segWidth,
-                                    cap = StrokeCap.Round
+                                    colorVal,
+                                    androidx.compose.ui.geometry.Offset(p1.x, p1.y),
+                                    androidx.compose.ui.geometry.Offset(p2.x, p2.y),
+                                    stroke.width * ((p1.pressure + p2.pressure) / 2f),
+                                    StrokeCap.Round
                                 )
                             }
                         }
                     }
                 }
 
-                // Render current active interactive stroke segments
+                // Live stroke being drawn
                 if (livePoints.size > 1) {
-                    val colorVal = if (isEraser) Color.Gray.copy(alpha = 0.4f) else selectedColor
+                    val colorVal = if (isEraser) Color(0xFFBBBBBB).copy(alpha = 0.5f) else selectedColor
                     val isHighlighter = colorVal.alpha < 0.9f && !isEraser
-                    
+
                     if (isHighlighter) {
                         val livePath = Path().apply {
                             val first = livePoints.first()
                             moveTo(first.x, first.y)
-                            var prevPt = first
+                            var prev = first
                             for (i in 1 until livePoints.size) {
                                 val pt = livePoints[i]
-                                val midX = (prevPt.x + pt.x) / 2f
-                                val midY = (prevPt.y + pt.y) / 2f
-                                if (i == 1) {
-                                    lineTo(midX, midY)
-                                } else {
-                                    quadraticTo(prevPt.x, prevPt.y, midX, midY)
-                                }
-                                prevPt = pt
+                                val midX = (prev.x + pt.x) / 2f
+                                val midY = (prev.y + pt.y) / 2f
+                                if (i == 1) lineTo(midX, midY) else quadraticTo(prev.x, prev.y, midX, midY)
+                                prev = pt
                             }
-                            lineTo(prevPt.x, prevPt.y)
+                            lineTo(livePoints.last().x, livePoints.last().y)
                         }
-                        drawPath(
-                            path = livePath,
-                            color = colorVal,
-                            style = Stroke(
-                                width = selectedWidth,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
-                        )
+                        drawPath(livePath, colorVal, style = Stroke(selectedWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     } else {
                         val activeWidth = if (isEraser) 30.0f / scale else selectedWidth
                         for (i in 0 until livePoints.size - 1) {
                             val p1 = livePoints[i]
                             val p2 = livePoints[i + 1]
-                            val segWidth = activeWidth * (if (isEraser) 1.2f else ((p1.pressure + p2.pressure) / 2f))
-                            drawLine(
-                                color = colorVal,
-                                start = androidx.compose.ui.geometry.Offset(p1.x, p1.y),
-                                end = androidx.compose.ui.geometry.Offset(p2.x, p2.y),
-                                strokeWidth = segWidth,
-                                cap = StrokeCap.Round
-                            )
+                            val w = activeWidth * (if (isEraser) 1.2f else ((p1.pressure + p2.pressure) / 2f))
+                            drawLine(colorVal, androidx.compose.ui.geometry.Offset(p1.x, p1.y), androidx.compose.ui.geometry.Offset(p2.x, p2.y), w, StrokeCap.Round)
                         }
                     }
                 }
             }
         }
 
-        // Floating zoom/pan controls widget
+        // Floating zoom/pan controls
         Card(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(10.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            shape = RoundedCornerShape(12.dp)
+            modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            shape = RoundedCornerShape(10.dp)
         ) {
             Row(
-                modifier = Modifier.padding(6.dp),
+                modifier = Modifier.padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Toggle mode between Free-draw vs Pan/Zoom Viewport drag navigation
                 IconButton(
                     onClick = { isPanMode = !isPanMode },
                     colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (isPanMode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+                        containerColor = if (isPanMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                     ),
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = if (isPanMode) Icons.Default.ZoomOutMap else Icons.Default.Gesture,
-                        contentDescription = "Toggle Pan/Zoom navigation mode",
-                        tint = if (isPanMode) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        if (isPanMode) Icons.Default.ZoomOutMap else Icons.Default.Gesture,
+                        contentDescription = "Toggle Pan",
+                        tint = if (isPanMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
+                VerticalDivider(modifier = Modifier.height(18.dp), thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-                // Zoom Out Button
-                IconButton(
-                    onClick = { scale = (scale - 0.2f).coerceIn(0.5f, 5.0f) },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = "Zoom Out",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
+                IconButton(onClick = { scale = (scale - 0.25f).coerceIn(0.5f, 5.0f) }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Remove, "Zoom Out", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+                Text("${(scale * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 2.dp))
+                IconButton(onClick = { scale = (scale + 0.25f).coerceIn(0.5f, 5.0f) }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Add, "Zoom In", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 }
 
-                // Current Zoom Percent status label
-                Text(
-                    text = "${(scale * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
+                VerticalDivider(modifier = Modifier.height(18.dp), thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-                // Zoom In Button
-                IconButton(
-                    onClick = { scale = (scale + 0.2f).coerceIn(0.5f, 5.0f) },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Zoom In",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                // Reset Canvas position to central home
-                IconButton(
-                    onClick = {
-                        scale = 1.0f
-                        offsetX = 0f
-                        offsetY = 0f
-                    },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Home,
-                        contentDescription = "Reset viewport",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
+                IconButton(onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Home, "Reset", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 }
             }
         }
     }
 }
 
-/**
- * Utility to convert vector drawing strokes to an ARGB_8888 Bitmap for sending to Gemini Vision API.
- * Updated to fully mimic the speed-tapered pressure smoothing of the hardware view layers.
- */
 fun strokesToBitmap(strokes: List<DrawingStroke>, width: Int, height: Int): Bitmap {
     val validWidth = width.coerceAtLeast(400)
     val validHeight = height.coerceAtLeast(400)
     val bitmap = Bitmap.createBitmap(validWidth, validHeight, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
-    
-    // Fill canvas backdrop white
     canvas.drawColor(android.graphics.Color.WHITE)
 
     val paint = android.graphics.Paint().apply {
@@ -429,9 +335,8 @@ fun strokesToBitmap(strokes: List<DrawingStroke>, width: Int, height: Int): Bitm
 
     strokes.forEach { stroke ->
         if (stroke.points.size > 1) {
-            val colorVal = Color(stroke.color)
+            val colorVal = androidx.compose.ui.graphics.Color(stroke.color)
             val isHighlighter = colorVal.alpha < 0.9f
-            
             if (isHighlighter) {
                 paint.color = stroke.color
                 paint.strokeWidth = stroke.width
@@ -439,32 +344,27 @@ fun strokesToBitmap(strokes: List<DrawingStroke>, width: Int, height: Int): Bitm
                 val path = android.graphics.Path()
                 val first = stroke.points.first()
                 path.moveTo(first.x, first.y)
-                var prevPt = first
+                var prev = first
                 for (i in 1 until stroke.points.size) {
                     val pt = stroke.points[i]
-                    val midX = (prevPt.x + pt.x) / 2f
-                    val midY = (prevPt.y + pt.y) / 2f
-                    if (i == 1) {
-                        path.lineTo(midX, midY)
-                    } else {
-                        path.quadTo(prevPt.x, prevPt.y, midX, midY)
-                    }
-                    prevPt = pt
+                    val midX = (prev.x + pt.x) / 2f
+                    val midY = (prev.y + pt.y) / 2f
+                    if (i == 1) path.lineTo(midX, midY) else path.quadTo(prev.x, prev.y, midX, midY)
+                    prev = pt
                 }
-                path.lineTo(prevPt.x, prevPt.y)
+                path.lineTo(stroke.points.last().x, stroke.points.last().y)
                 canvas.drawPath(path, paint)
             } else {
                 paint.color = stroke.color
                 paint.alpha = 255
                 for (i in 0 until stroke.points.size - 1) {
                     val p1 = stroke.points[i]
-                    val p2 = stroke.points[i+1]
+                    val p2 = stroke.points[i + 1]
                     paint.strokeWidth = stroke.width * ((p1.pressure + p2.pressure) / 2f)
                     canvas.drawLine(p1.x, p1.y, p2.x, p2.y, paint)
                 }
             }
         }
     }
-
     return bitmap
 }

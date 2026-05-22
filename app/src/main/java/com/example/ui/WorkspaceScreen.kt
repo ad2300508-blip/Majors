@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -23,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -34,74 +37,74 @@ import androidx.compose.ui.unit.sp
 import com.example.data.Course
 import com.example.data.Note
 
+// ── Drawing tool types ─────────────────────────────────────────────────────────
+enum class DrawTool { Pen, Pencil, Brush, Highlighter, Eraser }
+
+private val kPenColors = listOf(
+    Color(0xFF1A1A1A), Color(0xFF616161), Color(0xFFFFFFFF),
+    Color(0xFFB71C1C), Color(0xFFD32F2F), Color(0xFFE65100),
+    Color(0xFFF57F17), Color(0xFF1B5E20), Color(0xFF006064),
+    Color(0xFF0D47A1), Color(0xFF4A148C), Color(0xFF880E4F),
+)
+
+private val kHighlighterColors = listOf(
+    Color(0xFFFFF176), Color(0xFFB9F6CA), Color(0xFF80DEEA),
+    Color(0xFFFFAB91), Color(0xFFE1BEE7), Color(0xFFFFE0B2),
+)
+
+// ── 1. WorkspaceScreen ─────────────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkspaceScreen(
-    viewModel: AppViewModel,
-    modifier: Modifier = Modifier
-) {
-    val notes by viewModel.notes.collectAsState()
-    val courses by viewModel.courses.collectAsState()
-
-    val activeNoteId by viewModel.activeNoteId.collectAsState()
-    val activeNoteTitle by viewModel.activeNoteTitle.collectAsState()
-    val activeNoteText by viewModel.activeNoteText.collectAsState()
-    val activeNoteCourseId by viewModel.activeNoteCourseId.collectAsState()
-    val activeNoteStrokes by viewModel.activeNoteStrokes.collectAsState()
-
-    val ocrActive by viewModel.ocrActive.collectAsState()
+fun WorkspaceScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
+    val notes                    by viewModel.notes.collectAsState()
+    val courses                  by viewModel.courses.collectAsState()
+    val activeNoteId             by viewModel.activeNoteId.collectAsState()
+    val activeNoteTitle          by viewModel.activeNoteTitle.collectAsState()
+    val activeNoteText           by viewModel.activeNoteText.collectAsState()
+    val activeNoteCourseId       by viewModel.activeNoteCourseId.collectAsState()
+    val activeNoteStrokes        by viewModel.activeNoteStrokes.collectAsState()
+    val ocrActive                by viewModel.ocrActive.collectAsState()
     val handwritingSolvingActive by viewModel.handwritingSolvingActive.collectAsState()
-    val syncState by viewModel.syncState.collectAsState()
-    val aiAssistantActive by viewModel.aiAssistantActive.collectAsState()
+    val syncState                by viewModel.syncState.collectAsState()
+    val aiAssistantActive        by viewModel.aiAssistantActive.collectAsState()
     val lectureTranscribingActive by viewModel.lectureTranscribingActive.collectAsState()
 
-    // Search and filter notes
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterCourseId by remember { mutableStateOf<Long?>(null) }
 
     val filteredNotes = notes.filter { note ->
         (selectedFilterCourseId == null || note.courseId == selectedFilterCourseId) &&
-                (searchQuery.isEmpty() || note.title.contains(searchQuery, ignoreCase = true) || note.textContent.contains(searchQuery, ignoreCase = true))
+                (searchQuery.isEmpty() || note.title.contains(searchQuery, ignoreCase = true) ||
+                        note.textContent.contains(searchQuery, ignoreCase = true))
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTabletLandscape = maxWidth > 840.dp
 
         if (isTabletLandscape) {
-            // Tablet view: Dual-pane side-by-side permanent layout
             Row(modifier = Modifier.fillMaxSize()) {
-                // Left pane: Note explorer sidebar
                 NoteExplorerSidebar(
-                    notes = filteredNotes,
-                    courses = courses,
-                    activeNoteId = activeNoteId,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
+                    notes = filteredNotes, courses = courses, activeNoteId = activeNoteId,
+                    searchQuery = searchQuery, onSearchQueryChange = { searchQuery = it },
                     selectedFilterCourseId = selectedFilterCourseId,
                     onFilterCourseIdChange = { selectedFilterCourseId = it },
                     onSelectNote = { viewModel.setActiveNote(it) },
                     onCreateNewNote = { viewModel.createNewNote() },
                     onDeleteNote = { viewModel.deleteNote(it) },
                     onTogglePin = { viewModel.toggleNotePin(it) },
-                    modifier = Modifier.width(320.dp).fillMaxHeight()
+                    modifier = Modifier.width(300.dp).fillMaxHeight()
                 )
-
                 VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-                // Right pane: S-Pen Handwriting Canvas and text container
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (activeNoteId != null) {
                         ActiveNoteEditor(
                             noteId = activeNoteId,
-                            title = activeNoteTitle,
-                            text = activeNoteText,
-                            courseId = activeNoteCourseId,
-                            strokes = activeNoteStrokes,
-                            courses = courses,
-                            ocrActive = ocrActive,
+                            title = activeNoteTitle, text = activeNoteText,
+                            courseId = activeNoteCourseId, strokes = activeNoteStrokes,
+                            courses = courses, ocrActive = ocrActive,
                             handwritingSolvingActive = handwritingSolvingActive,
-                            syncState = syncState,
-                            aiAssistantActive = aiAssistantActive,
+                            syncState = syncState, aiAssistantActive = aiAssistantActive,
                             lectureTranscribingActive = lectureTranscribingActive,
                             onTitleChange = { viewModel.updateActiveNoteTitle(it) },
                             onTextChange = { viewModel.updateActiveNoteText(it) },
@@ -113,29 +116,22 @@ fun WorkspaceScreen(
                             onPerformAiAssistant = { viewModel.runNoteAiAssistant(it) },
                             onVoiceLectureTranscribe = { viewModel.runVoiceLectureTranscriber() },
                             onBackToNotesList = { viewModel.setActiveNote(null) },
-                            isTablet = true,
-                            modifier = Modifier.fillMaxSize()
+                            isTablet = true, modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        // Empty Workspace visual state
                         EmptyWorkspaceState(onCreateNote = { viewModel.createNewNote() })
                     }
                 }
             }
         } else {
-            // Mobile (Portrait / Compact) layout: Single-view switcher
             if (activeNoteId != null) {
                 ActiveNoteEditor(
                     noteId = activeNoteId,
-                    title = activeNoteTitle,
-                    text = activeNoteText,
-                    courseId = activeNoteCourseId,
-                    strokes = activeNoteStrokes,
-                    courses = courses,
-                    ocrActive = ocrActive,
+                    title = activeNoteTitle, text = activeNoteText,
+                    courseId = activeNoteCourseId, strokes = activeNoteStrokes,
+                    courses = courses, ocrActive = ocrActive,
                     handwritingSolvingActive = handwritingSolvingActive,
-                    syncState = syncState,
-                    aiAssistantActive = aiAssistantActive,
+                    syncState = syncState, aiAssistantActive = aiAssistantActive,
                     lectureTranscribingActive = lectureTranscribingActive,
                     onTitleChange = { viewModel.updateActiveNoteTitle(it) },
                     onTextChange = { viewModel.updateActiveNoteText(it) },
@@ -147,16 +143,12 @@ fun WorkspaceScreen(
                     onPerformAiAssistant = { viewModel.runNoteAiAssistant(it) },
                     onVoiceLectureTranscribe = { viewModel.runVoiceLectureTranscriber() },
                     onBackToNotesList = { viewModel.setActiveNote(null) },
-                    isTablet = false,
-                    modifier = Modifier.fillMaxSize()
+                    isTablet = false, modifier = Modifier.fillMaxSize()
                 )
             } else {
                 NoteExplorerSidebar(
-                    notes = filteredNotes,
-                    courses = courses,
-                    activeNoteId = activeNoteId,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
+                    notes = filteredNotes, courses = courses, activeNoteId = activeNoteId,
+                    searchQuery = searchQuery, onSearchQueryChange = { searchQuery = it },
                     selectedFilterCourseId = selectedFilterCourseId,
                     onFilterCourseIdChange = { selectedFilterCourseId = it },
                     onSelectNote = { viewModel.setActiveNote(it) },
@@ -169,6 +161,8 @@ fun WorkspaceScreen(
         }
     }
 }
+
+// ── 2. Note Explorer Sidebar ──────────────────────────────────────────────────
 
 @Composable
 fun NoteExplorerSidebar(
@@ -188,16 +182,13 @@ fun NoteExplorerSidebar(
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
 
     if (noteToDelete != null) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { noteToDelete = null },
             title = { Text("Delete Note?") },
-            text = { Text("Delete \"${noteToDelete!!.title}\"? This will also remove its flashcards.") },
+            text = { Text("\"${noteToDelete!!.title}\" will be permanently deleted along with its flashcards.") },
             confirmButton = {
                 Button(
-                    onClick = {
-                        onDeleteNote(noteToDelete!!.id)
-                        noteToDelete = null
-                    },
+                    onClick = { onDeleteNote(noteToDelete!!.id); noteToDelete = null },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete") }
             },
@@ -205,202 +196,210 @@ fun NoteExplorerSidebar(
         )
     }
 
-    Column(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Notebooks Explorer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            IconButton(
-                onClick = onCreateNewNote,
-                modifier = Modifier.testTag("explorer_add_note_button")
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
+
+        // Header
+        Surface(tonalElevation = 2.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.NoteAdd, contentDescription = "New Class Note", tint = MaterialTheme.colorScheme.primary)
+                Column {
+                    Text("Notebooks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("${notes.size} notes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                FilledTonalIconButton(
+                    onClick = onCreateNewNote,
+                    modifier = Modifier.testTag("explorer_add_note_button")
+                ) {
+                    Icon(Icons.Default.NoteAdd, contentDescription = "New Note")
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            placeholder = { Text("Search drafts, texts...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Course filter horizontal rail
-        Text("Sort By Class", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // "All" filter chip
-            FilterChip(
-                selected = selectedFilterCourseId == null,
-                onClick = { onFilterCourseIdChange(null) },
-                label = { Text("All", fontSize = 11.sp) }
-            )
-            courses.forEach { course ->
-                val color = Color(android.graphics.Color.parseColor(course.colorHex))
-                FilterChip(
-                    selected = selectedFilterCourseId == course.id,
-                    onClick = { onFilterCourseIdChange(course.id) },
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier.size(8.dp).background(color, CircleShape)
-                        )
-                    },
-                    label = { Text(course.code, fontSize = 11.sp) }
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            // Search
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = { Text("Search notes…", style = MaterialTheme.typography.bodyMedium) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 )
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Course filter chips
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(
+                    selected = selectedFilterCourseId == null,
+                    onClick = { onFilterCourseIdChange(null) },
+                    label = { Text("All", fontSize = 11.sp) }
+                )
+                courses.forEach { course ->
+                    val color = Color(android.graphics.Color.parseColor(course.colorHex))
+                    FilterChip(
+                        selected = selectedFilterCourseId == course.id,
+                        onClick = { onFilterCourseIdChange(course.id) },
+                        leadingIcon = {
+                            Box(modifier = Modifier.size(7.dp).background(color, CircleShape))
+                        },
+                        label = { Text(course.code, fontSize = 11.sp) }
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-        // Document List
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+        // Note list
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            modifier = Modifier.weight(1f)
+        ) {
             if (notes.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(top = 56.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape),
+                                    .size(60.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.BorderColor, contentDescription = null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                                Icon(Icons.Default.BorderColor, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                             }
-                            Text("No notes yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("Tap + to create your first note", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No notes yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("Tap + to start writing", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             } else {
                 items(notes) { note ->
-                    val course = courses.find { it.id == note.courseId }
-                    val isSelected = note.id == activeNoteId
-                    val courseColor = course?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) }
-                        ?: MaterialTheme.colorScheme.primary
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelectNote(note.id) }
-                            .border(
-                                width = if (isSelected) 1.5.dp else 0.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp)
-                            ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            // Left color accent bar
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .fillMaxHeight()
-                                    .background(
-                                        courseColor,
-                                        RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
-                                    )
-                                    .defaultMinSize(minHeight = 72.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = note.title,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Row {
-                                        IconButton(
-                                            onClick = { onTogglePin(note.id) },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (note.isPinned) Icons.Default.PushPin else Icons.Default.PushPin,
-                                                contentDescription = if (note.isPinned) "Unpin note" else "Pin note",
-                                                tint = if (note.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { noteToDelete = note },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = "Delete note",
-                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(3.dp))
-                                Text(
-                                    text = if (note.textContent.isNotEmpty()) note.textContent else "S-Pen canvas drawing",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = note.getRelativeTime(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    )
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        if (note.isSynced) {
-                                            Icon(Icons.Default.CloudDone, contentDescription = "Synced", tint = Color(0xFF4CAF50), modifier = Modifier.size(14.dp))
-                                        }
-                                        if (course != null) {
-                                            Surface(shape = RoundedCornerShape(5.dp), color = courseColor.copy(alpha = 0.15f)) {
-                                                Text(course.code, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), color = courseColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    NoteListItem(
+                        note = note,
+                        courses = courses,
+                        isSelected = note.id == activeNoteId,
+                        onSelect = { onSelectNote(note.id) },
+                        onDelete = { noteToDelete = note },
+                        onTogglePin = { onTogglePin(note.id) }
+                    )
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                        thickness = 0.5.dp
+                    )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun NoteListItem(
+    note: Note,
+    courses: List<Course>,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+    onTogglePin: () -> Unit,
+) {
+    val course = courses.find { it.id == note.courseId }
+    val courseColor = course?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) }
+        ?: MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
+                else Color.Transparent
+            )
+            .clickable(onClick = onSelect)
+    ) {
+        // Left accent bar
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .defaultMinSize(minHeight = 72.dp)
+                .background(if (isSelected) MaterialTheme.colorScheme.primary else courseColor.copy(alpha = 0.4f))
+        )
+        Row(modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
+            // Content
+            Column(modifier = Modifier.weight(1f).padding(start = 6.dp)) {
+                Text(
+                    note.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    if (note.textContent.isNotBlank()) note.textContent else "Drawing",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        note.getRelativeTime(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (note.isSynced) {
+                            Icon(Icons.Default.CloudDone, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(12.dp))
+                        }
+                        if (note.isPinned) {
+                            Icon(Icons.Default.PushPin, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                        }
+                        if (course != null) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = courseColor.copy(alpha = 0.15f)) {
+                                Text(
+                                    course.code, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                    color = courseColor, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Action buttons
+            Column(verticalArrangement = Arrangement.Center) {
+                IconButton(onClick = onTogglePin, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.PushPin, null,
+                        tint = if (note.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                        modifier = Modifier.size(14.dp))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
+                    Icon(Icons.Default.Delete, null,
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                        modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+    }
+}
+
+// ── 3. Active Note Editor ─────────────────────────────────────────────────────
 
 @Composable
 fun ActiveNoteEditor(
@@ -426,21 +425,29 @@ fun ActiveNoteEditor(
     onVoiceLectureTranscribe: () -> Unit,
     onBackToNotesList: () -> Unit,
     isTablet: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
-    // Canvas dimension states to accurately render export Bitmaps
-    var canvasWidth by remember { mutableStateOf(400) }
-    var canvasHeight by remember { mutableStateOf(400) }
-
+    // Undo/redo stacks
     val undoStack = remember { mutableStateListOf<List<com.example.data.DrawingStroke>>() }
     val redoStack = remember { mutableStateListOf<List<com.example.data.DrawingStroke>>() }
+    LaunchedEffect(noteId) { undoStack.clear(); redoStack.clear() }
 
-    // Clear history on loading another note
-    LaunchedEffect(noteId) {
-        undoStack.clear()
-        redoStack.clear()
+    // Drawing state
+    var drawTool by remember { mutableStateOf(DrawTool.Pen) }
+    var selectedPenColor by remember { mutableStateOf(kPenColors.first()) }
+    var selectedHighlighterColor by remember { mutableStateOf(kHighlighterColors.first()) }
+    var strokeWidth by remember { mutableStateOf(6f) }
+    var canvasBackground by remember { mutableStateOf("blank") }
+
+    LaunchedEffect(drawTool) {
+        strokeWidth = when (drawTool) {
+            DrawTool.Pencil     -> 3f
+            DrawTool.Brush      -> 10f
+            DrawTool.Highlighter -> 22f
+            else                -> 6f
+        }
     }
 
     val handleStrokesChange: (List<com.example.data.DrawingStroke>) -> Unit = { newStrokes ->
@@ -451,894 +458,776 @@ fun ActiveNoteEditor(
         }
     }
 
-    // Brush and guide layout configurations
-    var canvasBackgroundStyle by remember { mutableStateOf("blank") } // "blank", "ruled", "grid"
-    var brushMode by remember { mutableStateOf("pen") } // "pen", "pencil", "highlighter"
+    val isEraserEnabled = drawTool == DrawTool.Eraser
+    val effectiveColor = when (drawTool) {
+        DrawTool.Pencil      -> selectedPenColor.copy(alpha = 0.62f)
+        DrawTool.Brush       -> selectedPenColor.copy(alpha = 0.88f)
+        DrawTool.Highlighter -> selectedHighlighterColor.copy(alpha = 0.40f)
+        DrawTool.Eraser      -> Color(0xFFBBBBBB)
+        else                 -> selectedPenColor
+    }
+    val effectiveWidth = when (drawTool) {
+        DrawTool.Brush -> strokeWidth * 1.5f
+        else           -> strokeWidth
+    }
 
-    val brushColors = listOf(
-        Color(0xFF2C3E50), // Slate Black
-        Color(0xFFE74C3C), // Crimson Red
-        Color(0xFF27AE60), // Emerald Green
-        Color(0xFF2980B9), // Royal Blue
-        Color(0xFF8E44AD), // Amethyst Purple
-        Color(0xFFF1C40F)  // S-Pen Yellow
-    )
-    var selectedBrushColor by remember { mutableStateOf(brushColors.first()) }
-    var selectedBrushWidth by remember { mutableStateOf(8f) }
-    var isEraserEnabled by remember { mutableStateOf(false) }
-
+    var canvasWidth by remember { mutableStateOf(400) }
+    var canvasHeight by remember { mutableStateOf(400) }
     val activeCourse = courses.find { it.id == courseId }
 
-    // Trigger brush size and opacity defaults when mode shifts
-    LaunchedEffect(brushMode) {
-        selectedBrushWidth = when (brushMode) {
-            "pencil" -> 4f
-            "highlighter" -> 36f
-            else -> 8f
-        }
-    }
-
-    val effectiveColor = when (brushMode) {
-        "pencil" -> selectedBrushColor.copy(alpha = 0.6f)
-        "highlighter" -> selectedBrushColor.copy(alpha = 0.35f)
-        else -> selectedBrushColor
-    }
-
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Upper utility header
-        Row(
-            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+
+        // ── Top bar ──────────────────────────────────────────────────────────
+        Surface(tonalElevation = 3.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (!isTablet) {
-                    IconButton(onClick = onBackToNotesList) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Notes Explorer")
+                    IconButton(onClick = onBackToNotesList, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(22.dp))
                     }
                 }
 
-                // Title input field
                 OutlinedTextField(
                     value = title,
                     onValueChange = onTitleChange,
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent
+                        unfocusedBorderColor = Color.Transparent,
                     ),
-                    textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.width(280.dp).testTag("note_title_input")
+                    modifier = Modifier.weight(1f).testTag("note_title_input"),
+                    placeholder = { Text("Untitled Note", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)) }
                 )
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // Associated Course picker
-                var showCoursePickerMenu by remember { mutableStateOf(false) }
+                // Course chip
+                var showCourseMenu by remember { mutableStateOf(false) }
                 Box {
                     AssistChip(
-                        onClick = { showCoursePickerMenu = true },
-                        label = { Text(activeCourse?.code ?: "No Course Linked") },
+                        onClick = { showCourseMenu = true },
+                        label = { Text(activeCourse?.code ?: "No Course", maxLines = 1, fontSize = 12.sp) },
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Bookmark,
-                                contentDescription = null,
-                                tint = activeCourse?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color.Gray
-                            )
-                        }
+                            Box(modifier = Modifier.size(8.dp).background(
+                                activeCourse?.colorHex?.let { Color(android.graphics.Color.parseColor(it)) }
+                                    ?: MaterialTheme.colorScheme.outlineVariant,
+                                CircleShape
+                            ))
+                        },
+                        modifier = Modifier.height(32.dp)
                     )
-                    DropdownMenu(expanded = showCoursePickerMenu, onDismissRequest = { showCoursePickerMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Unlink Course") },
-                            onClick = {
-                                onCourseChange(null)
-                                showCoursePickerMenu = false
-                            }
-                        )
-                        courses.forEach { course ->
+                    DropdownMenu(expanded = showCourseMenu, onDismissRequest = { showCourseMenu = false }) {
+                        DropdownMenuItem(text = { Text("No Course") }, onClick = { onCourseChange(null); showCourseMenu = false })
+                        courses.forEach { c ->
                             DropdownMenuItem(
-                                text = { Text("${course.code} - ${course.name}") },
-                                onClick = {
-                                    onCourseChange(course.id)
-                                    showCoursePickerMenu = false
-                                }
+                                text = { Text("${c.code} – ${c.name}") },
+                                onClick = { onCourseChange(c.id); showCourseMenu = false }
                             )
                         }
                     }
                 }
-            }
 
-            // G-Drive status & triggering actions
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // S-Pen AI transcription button
-                Button(
-                    onClick = {
-                        val bitmap = strokesToBitmap(strokes, canvasWidth, canvasHeight)
-                        onPerformOCR(bitmap)
-                    },
-                    modifier = Modifier.testTag("spen_ocr_button"),
-                    enabled = strokes.isNotEmpty() && !ocrActive && !handwritingSolvingActive,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                ) {
-                    if (ocrActive) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                    } else {
-                        Icon(Icons.Default.Gesture, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("S-Pen OCR Text")
-                    }
-                }
+                Spacer(Modifier.width(4.dp))
 
-                // S-Pen AI Solve & Explain diagram/math button
-                Button(
-                    onClick = {
-                        val bitmap = strokesToBitmap(strokes, canvasWidth, canvasHeight)
-                        onSolveOrExplainHandwriting(bitmap)
-                    },
-                    modifier = Modifier.testTag("spen_solve_button"),
-                    enabled = strokes.isNotEmpty() && !ocrActive && !handwritingSolvingActive,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                ) {
-                    if (handwritingSolvingActive) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                    } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AI Solve & Explain")
-                    }
-                }
-
-                // Google Drive Sync button
+                // Action icons
                 IconButton(
-                    onClick = onSyncToDrive,
-                    modifier = Modifier.testTag("drive_sync_button")
+                    onClick = { onPerformOCR(strokesToBitmap(strokes, canvasWidth, canvasHeight)) },
+                    enabled = strokes.isNotEmpty() && !ocrActive && !handwritingSolvingActive,
+                    modifier = Modifier.size(40.dp).testTag("spen_ocr_button")
                 ) {
+                    if (ocrActive) CircularProgressIndicator(Modifier.size(18.dp))
+                    else Icon(Icons.Default.Gesture, "OCR", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(22.dp))
+                }
+                IconButton(
+                    onClick = { onSolveOrExplainHandwriting(strokesToBitmap(strokes, canvasWidth, canvasHeight)) },
+                    enabled = strokes.isNotEmpty() && !ocrActive && !handwritingSolvingActive,
+                    modifier = Modifier.size(40.dp).testTag("spen_solve_button")
+                ) {
+                    if (handwritingSolvingActive) CircularProgressIndicator(Modifier.size(18.dp))
+                    else Icon(Icons.Default.AutoAwesome, "AI Solve", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = onSyncToDrive, modifier = Modifier.size(40.dp).testTag("drive_sync_button")) {
                     when (syncState) {
-                        is SyncState.Syncing -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        is SyncState.Success -> Icon(Icons.Default.CloudDone, contentDescription = "Synced to Drive", tint = Color(0xFF4CAF50))
-                        is SyncState.Error -> Icon(Icons.Default.CloudOff, contentDescription = "Sync Error", tint = MaterialTheme.colorScheme.error)
-                        else -> Icon(Icons.Default.CloudUpload, contentDescription = "Sync to G-Drive", tint = MaterialTheme.colorScheme.primary)
+                        is SyncState.Syncing -> CircularProgressIndicator(Modifier.size(18.dp))
+                        is SyncState.Success -> Icon(Icons.Default.CloudDone, "Synced", tint = Color(0xFF4CAF50))
+                        is SyncState.Error   -> Icon(Icons.Default.CloudOff, "Error", tint = MaterialTheme.colorScheme.error)
+                        else                 -> Icon(Icons.Default.CloudUpload, "Sync", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                // Share note text
                 IconButton(
                     onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, title)
-                            putExtra(Intent.EXTRA_TEXT, "$title\n\n$text")
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Note"))
+                        context.startActivity(Intent.createChooser(
+                            Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, title); putExtra(Intent.EXTRA_TEXT, "$title\n\n$text") },
+                            "Share Note"
+                        ))
                     },
                     enabled = text.isNotEmpty(),
-                    modifier = Modifier.testTag("share_note_button")
+                    modifier = Modifier.size(40.dp).testTag("share_note_button")
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share Note", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Default.Share, "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        // Split-pane responsive layout wrapper
+        // ── Drawing toolbar (Samsung Notes-style) ─────────────────────────
+        DrawingToolbar(
+            drawTool = drawTool,
+            onToolChange = { drawTool = it },
+            canUndo = strokes.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty(),
+            onUndo = {
+                val prev = if (undoStack.isNotEmpty()) undoStack.removeLast() else emptyList()
+                redoStack.add(strokes.toList())
+                onStrokesChange(prev)
+            },
+            onRedo = {
+                if (redoStack.isNotEmpty()) {
+                    val next = redoStack.removeLast()
+                    undoStack.add(strokes.toList())
+                    onStrokesChange(next)
+                }
+            },
+            onClear = { onStrokesChange(emptyList()) },
+            backgroundStyle = canvasBackground,
+            onBackgroundStyleChange = { canvasBackground = it },
+        )
+
+        // ── Drawing properties (color + size, hidden when eraser) ─────────
+        AnimatedVisibility(
+            visible = drawTool != DrawTool.Eraser,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit  = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        ) {
+            DrawingPropertiesStrip(
+                drawTool = drawTool,
+                penColor = selectedPenColor,
+                highlighterColor = selectedHighlighterColor,
+                onPenColorChange = { selectedPenColor = it },
+                onHighlighterColorChange = { selectedHighlighterColor = it },
+                strokeWidth = strokeWidth,
+                onStrokeWidthChange = { strokeWidth = it },
+            )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+        // ── Canvas + text split ────────────────────────────────────────────
         ResponsiveSplitLayout(
             isTablet = isTablet,
-            canvasSection = { canvasModifier ->
-                Column(modifier = canvasModifier) {
-                // Drawing workspace heading and action row
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("S-Pen Stylus Slate", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Draw vectors, sketch graphs, or transcribe", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    // Background layout toggles (blank, ruled, grid)
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        listOf(
-                            "blank" to "⬜",
-                            "ruled" to "🗒️",
-                            "grid" to "🌐"
-                        ).forEach { (style, emoji) ->
-                            val isSelected = canvasBackgroundStyle == style
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                    .clickable { canvasBackgroundStyle = style }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "$emoji ${style.replaceFirstChar { it.lowercase() }}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Undo action Button
-                        IconButton(
-                            onClick = {
-                                if (strokes.isNotEmpty()) {
-                                    val previous = if (undoStack.isNotEmpty()) undoStack.removeLast() else emptyList()
-                                    redoStack.add(strokes)
-                                    onStrokesChange(previous)
-                                }
-                            },
-                            enabled = strokes.isNotEmpty()
-                        ) {
-                            Icon(
-                                Icons.Default.Undo,
-                                contentDescription = "Undo stroke",
-                                tint = if (strokes.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
-
-                        // Redo action Button
-                        IconButton(
-                            onClick = {
-                                if (redoStack.isNotEmpty()) {
-                                    val next = redoStack.removeLast()
-                                    undoStack.add(strokes)
-                                    onStrokesChange(next)
-                                }
-                            },
-                            enabled = redoStack.isNotEmpty()
-                        ) {
-                            Icon(
-                                Icons.Default.Redo,
-                                contentDescription = "Redo stroke",
-                                tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { isEraserEnabled = !isEraserEnabled },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isEraserEnabled) MaterialTheme.colorScheme.errorContainer else Color.Transparent
-                            )
-                        ) {
-                            Icon(
-                                Icons.Default.AutoFixNormal,
-                                contentDescription = "Toggle Eraser Mode",
-                                tint = if (isEraserEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        var showClearCanvasDialog by remember { mutableStateOf(false) }
-                        if (showClearCanvasDialog) {
-                            androidx.compose.material3.AlertDialog(
-                                onDismissRequest = { showClearCanvasDialog = false },
-                                title = { Text("Clear Canvas?") },
-                                text = { Text("All drawings on this canvas will be permanently removed.") },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            onStrokesChange(emptyList())
-                                            showClearCanvasDialog = false
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                                    ) { Text("Clear") }
-                                },
-                                dismissButton = { TextButton(onClick = { showClearCanvasDialog = false }) { Text("Cancel") } }
-                            )
-                        }
-                        IconButton(onClick = { showClearCanvasDialog = true }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear Canvas", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
-                        }
-                    }
-                }
-
-                // The functional interactive drawing layer
+            canvasSection = { canvasMod ->
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                        .onGloballyPositioned { layoutCoordinates ->
-                            canvasWidth = layoutCoordinates.size.width
-                            canvasHeight = layoutCoordinates.size.height
+                    modifier = canvasMod
+                        .onGloballyPositioned {
+                            canvasWidth = it.size.width
+                            canvasHeight = it.size.height
                         }
                 ) {
                     DrawingCanvas(
                         strokes = strokes,
                         selectedColor = effectiveColor,
-                        selectedWidth = selectedBrushWidth,
+                        selectedWidth = effectiveWidth,
                         onStrokesChanged = handleStrokesChange,
                         isEraser = isEraserEnabled,
-                        backgroundStyle = canvasBackgroundStyle,
+                        backgroundStyle = canvasBackground,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Canvas settings / Palette Toolbar
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Professional Stylus Brushes tabs
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-                                    .padding(4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                listOf(
-                                    "pen" to "🖊️ Fountain",
-                                    "pencil" to "✏️ Graphite",
-                                    "highlighter" to "🖍️ Highlighter"
-                                ).forEach { (mode, label) ->
-                                    val isSelected = brushMode == mode
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent)
-                                            .clickable {
-                                                brushMode = mode
-                                                isEraserEnabled = false
-                                            }
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = label,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Colored circular selectors
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                brushColors.forEach { color ->
-                                    val isSelected = selectedBrushColor == color && !isEraserEnabled
-                                    Box(
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .background(color, CircleShape)
-                                            .border(
-                                                width = if (isSelected) 3.dp else 1.dp,
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
-                                                shape = CircleShape
-                                            )
-                                            .clickable {
-                                                selectedBrushColor = color
-                                                isEraserEnabled = false
-                                            }
-                                    )
-                                }
-                            }
-                        }
-
-                        // Slider for stroke width
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Icon(
-                                Icons.Default.LineWeight,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Thickness (${selectedBrushWidth.toInt()}px):",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.width(90.dp)
-                            )
-                            Slider(
-                                value = selectedBrushWidth,
-                                onValueChange = { selectedBrushWidth = it },
-                                valueRange = when (brushMode) {
-                                    "pencil" -> 1f..12f
-                                    "highlighter" -> 16f..80f
-                                    else -> 2f..32f
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-                }
             },
-            textSummarySection = { summaryModifier ->
-                Column(modifier = summaryModifier) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            "Recognized Notes & Summary",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text("Interactive textbook and research board", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                // AI Notebook Actions Toolbar Block
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            "Gemini Smart Study Assistants:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Button(
-                                onClick = { onPerformAiAssistant("format") },
-                                modifier = Modifier.weight(1.1f).testTag("ai_format_notes_button"),
-                                enabled = text.isNotEmpty() && !aiAssistantActive,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                if (aiAssistantActive) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp))
-                                } else {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Formatting Style", fontSize = 11.sp, maxLines = 1)
-                                }
-                            }
-
-                            Button(
-                                onClick = { onPerformAiAssistant("explain") },
-                                modifier = Modifier.weight(1.1f).testTag("ai_explain_notes_button"),
-                                enabled = text.isNotEmpty() && !aiAssistantActive,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                if (aiAssistantActive) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp))
-                                } else {
-                                    Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("AI Concept Dive", fontSize = 11.sp, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 🎙️ Lecture Audio Memo Bench
-                var isRecordingActive by remember { mutableStateOf(false) }
-                var isRecordingPaused by remember { mutableStateOf(false) }
-                var recordingTimeSeconds by remember { mutableStateOf(0) }
-                val wavePeaks = remember { mutableStateListOf<Float>() }
-                val localLectures = remember { mutableStateListOf<String>() }
-
-                // Wave oscillator animation loop when active
-                LaunchedEffect(isRecordingActive, isRecordingPaused) {
-                    if (isRecordingActive && !isRecordingPaused) {
-                        while (true) {
-                            kotlinx.coroutines.delay(100)
-                            val amplitude = (15..85).random().toFloat()
-                            wavePeaks.add(amplitude)
-                            if (wavePeaks.size > 24) {
-                                wavePeaks.removeAt(0)
-                            }
-                        }
-                    } else {
-                        wavePeaks.clear()
-                    }
-                }
-
-                LaunchedEffect(isRecordingActive, isRecordingPaused) {
-                    if (isRecordingActive && !isRecordingPaused) {
-                        while (true) {
-                            kotlinx.coroutines.delay(1000)
-                            recordingTimeSeconds += 1
-                        }
-                    }
-                }
-
-                val formattedTime = remember(recordingTimeSeconds) {
-                    val minutes = recordingTimeSeconds / 60
-                    val seconds = recordingTimeSeconds % 60
-                    String.format("%02d:%02d", minutes, seconds)
-                }
-
-                val stopRecordingAndSave: () -> Unit = {
-                    isRecordingActive = false
-                    isRecordingPaused = false
-                    val docTitle = if (title.startsWith("New Class Note") || title.trim().isEmpty()) "Lecture Session" else title
-                    localLectures.add("$docTitle - Audio Lecture (${formattedTime})")
-                    recordingTimeSeconds = 0
-                }
-
-                var audioBenchExpanded by remember { mutableStateOf(false) }
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { audioBenchExpanded = !audioBenchExpanded },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (isRecordingActive) Icons.Default.SettingsVoice else Icons.Default.Mic,
-                                    contentDescription = null,
-                                    tint = if (isRecordingActive) Color.Red else MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    "Class Lecture Audio Bench",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                if (isRecordingActive) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color.Red, CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        "Recording $formattedTime",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.Red,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Icon(
-                                imageVector = if (audioBenchExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (audioBenchExpanded) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Action buttons / waveform drawing bounds
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (!isRecordingActive) {
-                                    Button(
-                                        onClick = {
-                                            isRecordingActive = true
-                                            isRecordingPaused = false
-                                            recordingTimeSeconds = 0
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE74C3C))
-                                    ) {
-                                        Icon(Icons.Default.FiberManualRecord, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Record Lecture", fontSize = 11.sp, maxLines = 1)
-                                    }
-                                } else {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Button(
-                                            onClick = { isRecordingPaused = !isRecordingPaused },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isRecordingPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(if (isRecordingPaused) "Resume" else "Pause", fontSize = 11.sp, maxLines = 1)
-                                        }
-                                        Button(
-                                            onClick = stopRecordingAndSave,
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Save Memo", fontSize = 11.sp, maxLines = 1)
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                // Live Oscillating sound peaks waveform
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val density = LocalDensity.current
-                                    val barWidthPx = with(density) { 3.dp.toPx() }
-                                    val gapPx = with(density) { 2.dp.toPx() }
-                                    val startXPx = with(density) { 6.dp.toPx() }
-                                    val activeLineColor = Color.Red.copy(alpha = 0.8f)
-                                    val inactiveLineColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
-
-                                    Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val midY = size.height / 2f
-                                        
-                                        if (isRecordingActive && !isRecordingPaused) {
-                                            wavePeaks.forEachIndexed { idx, heightVal ->
-                                                val x = startXPx + idx * (barWidthPx + gapPx)
-                                                val h = with(density) { heightVal.dp.toPx() }.coerceAtMost(size.height * 0.8f)
-                                                drawLine(
-                                                    color = activeLineColor,
-                                                    start = androidx.compose.ui.geometry.Offset(x, midY - h / 2f),
-                                                    end = androidx.compose.ui.geometry.Offset(x, midY + h / 2f),
-                                                    strokeWidth = barWidthPx
-                                                )
-                                            }
-                                        } else {
-                                            for (i in 0..20) {
-                                                val x = startXPx + i * (barWidthPx + gapPx)
-                                                drawLine(
-                                                    color = inactiveLineColor,
-                                                    start = androidx.compose.ui.geometry.Offset(x, midY - 3f),
-                                                    end = androidx.compose.ui.geometry.Offset(x, midY + 3f),
-                                                    strokeWidth = barWidthPx
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (localLectures.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text("Classroom Audio Saves:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    localLectures.forEach { lecture ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                Icon(Icons.Default.AudioFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(lecture, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-
-                                            Button(
-                                                onClick = onVoiceLectureTranscribe,
-                                                modifier = Modifier.height(26.dp).testTag("ai_transcribe_audio_button"),
-                                                enabled = !lectureTranscribingActive,
-                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                if (lectureTranscribingActive) {
-                                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(10.dp))
-                                                } else {
-                                                    Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(10.dp))
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("AI Transcribe", fontSize = 9.sp)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Quick Markdown Formatting preset toolbar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 6.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Format: ",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    
-                    val insertMarkdown: (String) -> Unit = { tag ->
-                        val newText = when (tag) {
-                            "H1" -> "$text\n# "
-                            "H2" -> "$text\n## "
-                            "bold" -> "$text**Bold** "
-                            "italic" -> "$text*Italic* "
-                            "bullet" -> "$text\n- "
-                            "todo" -> "$text\n- [ ] "
-                            "timestamp" -> {
-                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-                                "$text\n📅 ${sdf.format(java.util.Date())}: "
-                            }
-                            else -> text
-                        }
-                        onTextChange(newText)
-                    }
-
-                    listOf(
-                        "H1" to "H1",
-                        "H2" to "H2",
-                        "bold" to "B",
-                        "italic" to "I",
-                        "bullet" to "•",
-                        "todo" to "☑",
-                        "timestamp" to "🕒 Time"
-                    ).forEach { (tag, label) ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { insertMarkdown(tag) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    IconButton(
-                        onClick = { onTextChange("") },
-                        modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear All Text",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    placeholder = { Text("Transcribed characters, manual typewriter inputs, or AI formatted texts will stream here...") },
-                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("note_text_input"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                    )
-                )
-
-                val wordCount = remember(text) {
-                    if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).size
-                }
-                val charCount = text.length
-                Text(
-                    text = "$wordCount words · $charCount chars",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
+            textSummarySection = { summaryMod ->
+                NoteTextSection(
+                    text = text,
+                    onTextChange = onTextChange,
+                    aiAssistantActive = aiAssistantActive,
+                    lectureTranscribingActive = lectureTranscribingActive,
+                    onPerformAiAssistant = onPerformAiAssistant,
+                    onVoiceLectureTranscribe = onVoiceLectureTranscribe,
+                    noteTitle = title,
+                    modifier = summaryMod,
                 )
             }
-        })
+        )
     }
 }
+
+// ── 4. Drawing Toolbar ─────────────────────────────────────────────────────────
+
+@Composable
+private fun DrawingToolbar(
+    drawTool: DrawTool,
+    onToolChange: (DrawTool) -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onClear: () -> Unit,
+    backgroundStyle: String,
+    onBackgroundStyleChange: (String) -> Unit,
+) {
+    var showClearDialog by remember { mutableStateOf(false) }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Clear canvas?") },
+            text = { Text("All drawings will be permanently removed.") },
+            confirmButton = {
+                Button(
+                    onClick = { onClear(); showClearDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Drawing tools
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                DrawToolButton(Icons.Default.Edit,          "Pen",       drawTool == DrawTool.Pen)         { onToolChange(DrawTool.Pen) }
+                DrawToolButton(Icons.Default.Gesture,       "Pencil",    drawTool == DrawTool.Pencil)      { onToolChange(DrawTool.Pencil) }
+                DrawToolButton(Icons.Default.Brush,         "Brush",     drawTool == DrawTool.Brush)       { onToolChange(DrawTool.Brush) }
+                DrawToolButton(Icons.Default.BorderColor,   "Highlight", drawTool == DrawTool.Highlighter) { onToolChange(DrawTool.Highlighter) }
+            }
+
+            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            DrawToolButton(Icons.Default.AutoFixNormal, "Eraser", drawTool == DrawTool.Eraser) { onToolChange(DrawTool.Eraser) }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Undo / Redo
+            IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Undo, "Undo",
+                    tint = if (canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
+                    modifier = Modifier.size(20.dp))
+            }
+            IconButton(onClick = onRedo, enabled = canRedo, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Redo, "Redo",
+                    tint = if (canRedo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
+                    modifier = Modifier.size(20.dp))
+            }
+
+            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Clear canvas
+            IconButton(onClick = { showClearDialog = true }, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.DeleteSweep, "Clear",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp))
+            }
+
+            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Background style toggles
+            listOf("blank" to "—", "ruled" to "≡", "grid" to "#", "dotted" to "⠿").forEach { (style, label) ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (backgroundStyle == style) MaterialTheme.colorScheme.primaryContainer
+                            else Color.Transparent
+                        )
+                        .clickable { onBackgroundStyleChange(style) }
+                        .padding(horizontal = 7.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        color = if (backgroundStyle == style) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrawToolButton(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(21.dp)
+        )
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+// ── 5. Drawing Properties Strip ───────────────────────────────────────────────
+
+@Composable
+private fun DrawingPropertiesStrip(
+    drawTool: DrawTool,
+    penColor: Color,
+    highlighterColor: Color,
+    onPenColorChange: (Color) -> Unit,
+    onHighlighterColorChange: (Color) -> Unit,
+    strokeWidth: Float,
+    onStrokeWidthChange: (Float) -> Unit,
+) {
+    val isHighlighter = drawTool == DrawTool.Highlighter
+    val palette       = if (isHighlighter) kHighlighterColors else kPenColors
+    val selected      = if (isHighlighter) highlighterColor else penColor
+
+    val widthRange = when (drawTool) {
+        DrawTool.Pencil      -> 1f..12f
+        DrawTool.Highlighter -> 15f..60f
+        DrawTool.Brush       -> 4f..36f
+        else                 -> 2f..28f
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Color dots
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                palette.forEach { color ->
+                    val isSelected = selected == color
+                    val displayColor = if (isHighlighter) color.copy(alpha = 0.75f) else color
+                    Box(
+                        modifier = Modifier
+                            .size(if (isSelected) 30.dp else 25.dp)
+                            .clip(CircleShape)
+                            .background(displayColor)
+                            .border(
+                                width = if (isSelected) 2.5.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                shape = CircleShape
+                            )
+                            .clickable {
+                                if (isHighlighter) onHighlighterColorChange(color)
+                                else onPenColorChange(color)
+                            }
+                    )
+                }
+            }
+
+            VerticalDivider(modifier = Modifier.height(28.dp).padding(horizontal = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Visual size preview dot
+            val fraction = (strokeWidth - widthRange.start) / (widthRange.endInclusive - widthRange.start)
+            val previewDp = (4f + fraction * 24f).dp
+            Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(previewDp)
+                        .background(
+                            if (isHighlighter) selected.copy(alpha = 0.55f) else selected,
+                            CircleShape
+                        )
+                )
+            }
+
+            // Stroke width slider
+            Slider(
+                value = strokeWidth,
+                onValueChange = onStrokeWidthChange,
+                valueRange = widthRange,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                )
+            )
+        }
+    }
+}
+
+// ── 6. Note Text Section ──────────────────────────────────────────────────────
+
+@Composable
+private fun NoteTextSection(
+    text: String,
+    onTextChange: (String) -> Unit,
+    aiAssistantActive: Boolean,
+    lectureTranscribingActive: Boolean,
+    onPerformAiAssistant: (String) -> Unit,
+    onVoiceLectureTranscribe: () -> Unit,
+    noteTitle: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+
+        // AI action chips
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f),
+            shape = RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
+                Text("Gemini Assistants", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip(
+                        onClick = { onPerformAiAssistant("format") },
+                        label = {
+                            if (aiAssistantActive) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(Modifier.size(12.dp)); Spacer(Modifier.width(4.dp)); Text("Working…", fontSize = 11.sp)
+                                }
+                            } else {
+                                Text("Format Notes", fontSize = 11.sp)
+                            }
+                        },
+                        leadingIcon = { Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(14.dp)) },
+                        enabled = text.isNotEmpty() && !aiAssistantActive,
+                        modifier = Modifier.testTag("ai_format_notes_button"),
+                    )
+                    AssistChip(
+                        onClick = { onPerformAiAssistant("explain") },
+                        label = { Text("Concept Dive", fontSize = 11.sp) },
+                        leadingIcon = { Icon(Icons.Default.School, null, modifier = Modifier.size(14.dp)) },
+                        enabled = text.isNotEmpty() && !aiAssistantActive,
+                        modifier = Modifier.testTag("ai_explain_notes_button"),
+                    )
+                }
+            }
+        }
+
+        // Audio lecture bench (collapsible)
+        AudioLectureBench(
+            noteTitle = noteTitle,
+            lectureTranscribingActive = lectureTranscribingActive,
+            onVoiceLectureTranscribe = onVoiceLectureTranscribe,
+        )
+
+        // Markdown format toolbar
+        MarkdownToolbar(text = text, onTextChange = onTextChange)
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+        // Text editor
+        OutlinedTextField(
+            value = text,
+            onValueChange = onTextChange,
+            placeholder = { Text("Transcribed text, notes, or AI-formatted content appears here…", style = MaterialTheme.typography.bodySmall) },
+            modifier = Modifier.fillMaxWidth().weight(1f).testTag("note_text_input"),
+            shape = RoundedCornerShape(0.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            )
+        )
+
+        // Word / char count
+        val wordCount = remember(text) { if (text.isBlank()) 0 else text.trim().split(Regex("\\s+")).size }
+        Row(
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                "$wordCount words · ${text.length} chars",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MarkdownToolbar(text: String, onTextChange: (String) -> Unit) {
+    val insertMarkdown: (String) -> Unit = { tag ->
+        val newText = when (tag) {
+            "H1"        -> "$text\n# "
+            "H2"        -> "$text\n## "
+            "bold"      -> "$text**Bold** "
+            "italic"    -> "$text*Italic* "
+            "bullet"    -> "$text\n- "
+            "todo"      -> "$text\n- [ ] "
+            "timestamp" -> {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                "$text\n📅 ${sdf.format(java.util.Date())}: "
+            }
+            else -> text
+        }
+        onTextChange(newText)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf("H1" to "H1", "H2" to "H2", "bold" to "B", "italic" to "I", "bullet" to "•", "todo" to "☑", "timestamp" to "🕒").forEach { (tag, label) ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { insertMarkdown(tag) }
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        IconButton(onClick = { onTextChange("") }, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.DeleteSweep, "Clear text",
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun AudioLectureBench(
+    noteTitle: String,
+    lectureTranscribingActive: Boolean,
+    onVoiceLectureTranscribe: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var isRecordingActive by remember { mutableStateOf(false) }
+    var isRecordingPaused by remember { mutableStateOf(false) }
+    var recordingTimeSeconds by remember { mutableStateOf(0) }
+    val wavePeaks = remember { mutableStateListOf<Float>() }
+    val localLectures = remember { mutableStateListOf<String>() }
+
+    LaunchedEffect(isRecordingActive, isRecordingPaused) {
+        if (isRecordingActive && !isRecordingPaused) {
+            while (true) {
+                kotlinx.coroutines.delay(100)
+                wavePeaks.add((15..85).random().toFloat())
+                if (wavePeaks.size > 24) wavePeaks.removeAt(0)
+            }
+        } else wavePeaks.clear()
+    }
+    LaunchedEffect(isRecordingActive, isRecordingPaused) {
+        if (isRecordingActive && !isRecordingPaused) {
+            while (true) { kotlinx.coroutines.delay(1000); recordingTimeSeconds += 1 }
+        }
+    }
+
+    val formattedTime = remember(recordingTimeSeconds) {
+        String.format("%02d:%02d", recordingTimeSeconds / 60, recordingTimeSeconds % 60)
+    }
+    val stopAndSave: () -> Unit = {
+        isRecordingActive = false; isRecordingPaused = false
+        val docTitle = if (noteTitle.startsWith("New Class Note") || noteTitle.isBlank()) "Lecture Session" else noteTitle
+        localLectures.add("$docTitle – Audio ($formattedTime)")
+        recordingTimeSeconds = 0
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(0.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.18f)),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (isRecordingActive) Icons.Default.SettingsVoice else Icons.Default.Mic,
+                        null,
+                        tint = if (isRecordingActive) Color(0xFFE53935) else MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Lecture Audio", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    if (isRecordingActive) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(modifier = Modifier.size(6.dp).background(Color(0xFFE53935), CircleShape))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Recording $formattedTime", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
+                    }
+                }
+                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        if (!isRecordingActive) {
+                            Button(
+                                onClick = { isRecordingActive = true; isRecordingPaused = false; recordingTimeSeconds = 0 },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.FiberManualRecord, null, Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Record", fontSize = 11.sp)
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedButton(
+                                    onClick = { isRecordingPaused = !isRecordingPaused },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(if (isRecordingPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, Modifier.size(12.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(if (isRecordingPaused) "Resume" else "Pause", fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = stopAndSave,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.Stop, null, Modifier.size(12.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Save", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        // Waveform
+                        val density = LocalDensity.current
+                        val activeColor = Color(0xFFE53935).copy(alpha = 0.8f)
+                        val inactiveColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+                        Box(
+                            modifier = Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val barW = with(density) { 3.dp.toPx() }
+                                val gap  = with(density) { 2.dp.toPx() }
+                                val startX = with(density) { 6.dp.toPx() }
+                                val midY = size.height / 2f
+                                if (isRecordingActive && !isRecordingPaused) {
+                                    wavePeaks.forEachIndexed { i, h ->
+                                        val x = startX + i * (barW + gap)
+                                        val hp = with(density) { h.dp.toPx() }.coerceAtMost(size.height * 0.8f)
+                                        drawLine(activeColor, androidx.compose.ui.geometry.Offset(x, midY - hp / 2f), androidx.compose.ui.geometry.Offset(x, midY + hp / 2f), barW)
+                                    }
+                                } else {
+                                    for (i in 0..20) {
+                                        val x = startX + i * (barW + gap)
+                                        drawLine(inactiveColor, androidx.compose.ui.geometry.Offset(x, midY - 3f), androidx.compose.ui.geometry.Offset(x, midY + 3f), barW)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (localLectures.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Saved Recordings", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.height(4.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            localLectures.forEach { lecture ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(lecture, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    Button(
+                                        onClick = onVoiceLectureTranscribe,
+                                        modifier = Modifier.height(26.dp).testTag("ai_transcribe_audio_button"),
+                                        enabled = !lectureTranscribingActive,
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    ) {
+                                        if (lectureTranscribingActive) CircularProgressIndicator(Modifier.size(10.dp), color = Color.White)
+                                        else {
+                                            Icon(Icons.Default.GraphicEq, null, Modifier.size(10.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Transcribe", fontSize = 9.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── 7. Empty workspace state ──────────────────────────────────────────────────
 
 @Composable
 fun EmptyWorkspaceState(onCreateNote: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.padding(40.dp)
         ) {
-            // Layered icon illustration
             Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .background(
-                            androidx.compose.ui.graphics.Brush.radialGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f)
-                                )
-                            ),
-                            androidx.compose.foundation.shape.CircleShape
+                Box(modifier = Modifier.size(96.dp).background(
+                    androidx.compose.ui.graphics.Brush.radialGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0f)
                         )
-                )
+                    ), CircleShape
+                ))
                 Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+                    modifier = Modifier.size(68.dp).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.EditCalendar,
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                    )
+                    Icon(Icons.Default.EditCalendar, null, modifier = Modifier.size(34.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f))
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Select a note to begin", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Select a note to begin",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    "Choose from the sidebar or create a new workspace",
+                    "Choose a note from the sidebar or start a new one",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
-            Button(
-                onClick = onCreateNote,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Create New Note", fontWeight = FontWeight.SemiBold)
+            Button(onClick = onCreateNote, shape = RoundedCornerShape(12.dp)) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("New Note", fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
+
+// ── 8. Responsive split layout ────────────────────────────────────────────────
 
 @Composable
 fun ColumnScope.ResponsiveSplitLayout(
@@ -1349,9 +1238,9 @@ fun ColumnScope.ResponsiveSplitLayout(
     var selectedTab by remember { mutableStateOf(0) }
     if (isTablet) {
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            canvasSection(Modifier.weight(1.1f).fillMaxHeight().padding(12.dp))
+            canvasSection(Modifier.weight(1.2f).fillMaxHeight())
             VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            textSummarySection(Modifier.weight(0.9f).fillMaxHeight().padding(12.dp))
+            textSummarySection(Modifier.weight(0.8f).fillMaxHeight())
         }
     } else {
         Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -1364,22 +1253,19 @@ fun ColumnScope.ResponsiveSplitLayout(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Stylus Slate", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Gesture, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    text = { Text("Drawing", fontWeight = FontWeight.SemiBold) },
+                    icon = { Icon(Icons.Default.Gesture, null, modifier = Modifier.size(16.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("AI Summary", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    text = { Text("Notes", fontWeight = FontWeight.SemiBold) },
+                    icon = { Icon(Icons.Default.Description, null, modifier = Modifier.size(16.dp)) }
                 )
             }
-            Box(modifier = Modifier.fillMaxWidth().weight(1f).padding(12.dp)) {
-                if (selectedTab == 0) {
-                    canvasSection(Modifier.fillMaxSize())
-                } else {
-                    textSummarySection(Modifier.fillMaxSize())
-                }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                if (selectedTab == 0) canvasSection(Modifier.fillMaxSize())
+                else textSummarySection(Modifier.fillMaxSize())
             }
         }
     }
