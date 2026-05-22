@@ -72,9 +72,11 @@ fun DashboardScreen(
     onNavigateToPage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val courses     by viewModel.courses.collectAsState()
-    val notes       by viewModel.notes.collectAsState()
-    val assignments by viewModel.assignments.collectAsState()
+    val courses          by viewModel.courses.collectAsState()
+    val notes            by viewModel.notes.collectAsState()
+    val assignments      by viewModel.assignments.collectAsState()
+    val pomodoroWorkMins by viewModel.pomodoroWorkMins.collectAsState()
+    val pomodoroBreakMins by viewModel.pomodoroBreakMins.collectAsState()
     val pending = assignments.filter { !it.isCompleted }
     var showAddCourseDialog by remember { mutableStateOf(false) }
 
@@ -132,7 +134,7 @@ fun DashboardScreen(
             if (isTablet) {
                 // Pomodoro + Schedule side by side on tablet
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    PomodoroTimerCard(modifier = Modifier.width(220.dp))
+                    PomodoroTimerCard(workMins = pomodoroWorkMins, breakMins = pomodoroBreakMins, modifier = Modifier.width(240.dp))
                     WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = true, modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -141,15 +143,19 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     DashboardRecentNotesCard(notes = notes, courses = courses, viewModel = viewModel, onNavigate = onNavigateToPage, modifier = Modifier.weight(1.2f))
-                    DashboardPendingCard(pending = pending, courses = courses, modifier = Modifier.weight(1f))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        MiniCalendarCard(assignments = assignments, courses = courses)
+                        DashboardPendingCard(pending = pending, courses = courses)
+                    }
                 }
             } else {
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    PomodoroTimerCard()
+                    PomodoroTimerCard(workMins = pomodoroWorkMins, breakMins = pomodoroBreakMins)
                     WeeklyScheduleSection(courses = courses, onAddClassClick = { showAddCourseDialog = true }, isTablet = false)
+                    MiniCalendarCard(assignments = assignments, courses = courses)
                     DashboardRecentNotesCard(notes = notes, courses = courses, viewModel = viewModel, onNavigate = onNavigateToPage)
                     DashboardPendingCard(pending = pending, courses = courses)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -330,6 +336,109 @@ private fun DashboardPendingCard(
                         val course = courses.find { it.id == assignment.courseId }
                         val urgency = remember(assignment.dueDate) { dueDateUrgency(assignment.dueDate) }
                         AssignmentRow(assignment = assignment, course = course, urgency = urgency)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniCalendarCard(assignments: List<Assignment>, courses: List<Course>, modifier: Modifier = Modifier) {
+    val today = remember {
+        java.util.Calendar.getInstance().let {
+            Triple(it.get(java.util.Calendar.YEAR), it.get(java.util.Calendar.MONTH), it.get(java.util.Calendar.DAY_OF_MONTH))
+        }
+    }
+    var displayYear  by remember { mutableStateOf(today.first) }
+    var displayMonth by remember { mutableStateOf(today.second) }
+
+    val firstDayOfWeek = remember(displayYear, displayMonth) {
+        java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }
+            .get(java.util.Calendar.DAY_OF_WEEK) - 1
+    }
+    val daysInMonth = remember(displayYear, displayMonth) {
+        java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }
+            .getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    }
+    val monthLabel = remember(displayYear, displayMonth) {
+        java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(
+            java.util.Calendar.getInstance().apply { set(displayYear, displayMonth, 1) }.time
+        )
+    }
+    val dayDots = remember(assignments, displayYear, displayMonth) {
+        val map = mutableMapOf<Int, List<String>>()
+        assignments.filter { !it.isCompleted }.forEach { a ->
+            runCatching {
+                val parts = a.dueDate.split("-")
+                val y = parts[0].toInt(); val m = parts[1].toInt() - 1; val d = parts[2].toInt()
+                if (y == displayYear && m == displayMonth) {
+                    val hex = courses.find { it.id == a.courseId }?.colorHex ?: "#1E88E5"
+                    map[d] = (map[d] ?: emptyList()) + hex
+                }
+            }
+        }
+        map
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    if (displayMonth == 0) { displayMonth = 11; displayYear-- } else displayMonth--
+                }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.ChevronLeft, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(monthLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = {
+                    if (displayMonth == 11) { displayMonth = 0; displayYear++ } else displayMonth++
+                }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("S","M","T","W","T","F","S").forEach { d ->
+                    Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            val rows = ((firstDayOfWeek + daysInMonth) + 6) / 7
+            repeat(rows) { row ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    repeat(7) { col ->
+                        val day = row * 7 + col - firstDayOfWeek + 1
+                        val isToday = day == today.third && displayMonth == today.second && displayYear == today.first
+                        val dots = dayDots[day]
+                        Box(modifier = Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+                            if (day in 1..daysInMonth) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                    Box(
+                                        modifier = Modifier.size(22.dp).background(
+                                            if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$day", style = MaterialTheme.typography.labelSmall,
+                                            color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
+                                    }
+                                    if (!dots.isNullOrEmpty()) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.height(5.dp)) {
+                                            dots.take(3).forEach { hex ->
+                                                Box(modifier = Modifier.size(4.dp).background(
+                                                    Color(android.graphics.Color.parseColor(hex)), CircleShape))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1367,7 +1476,9 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
     val activeNoteId   by viewModel.activeNoteId.collectAsState()
     val generationActive by viewModel.flashcardGenerationActive.collectAsState()
 
-    val displayCards = if (activeNoteId != null) quizCards else allFlashcards
+    val baseCards  = if (activeNoteId != null) quizCards else allFlashcards
+    var shuffled   by remember { mutableStateOf(false) }
+    val displayCards = remember(baseCards, shuffled) { if (shuffled) baseCards.shuffled() else baseCards }
     var cardIndex  by remember { mutableStateOf(0) }
     var flipStatus by remember { mutableStateOf(false) }
     var correct    by remember { mutableStateOf(0) }
@@ -1406,6 +1517,16 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { shuffled = !shuffled; cardIndex = 0; flipStatus = false },
+                ) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
                 if (activeNoteId != null) {
                     FilledTonalButton(
                         onClick = { viewModel.generateAIStudyFlashcards() },
@@ -1421,6 +1542,7 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
                         }
                     }
                 }
+                } // Row wrapping shuffle + AI button
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -1612,18 +1734,82 @@ fun FlashcardStudyScreen(viewModel: AppViewModel, modifier: Modifier = Modifier)
 
 @Composable
 fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
-    val email     by viewModel.googleAccountEmail.collectAsState()
-    val syncState by viewModel.syncState.collectAsState()
-    val notes     by viewModel.notes.collectAsState()
+    val email          by viewModel.googleAccountEmail.collectAsState()
+    val syncState      by viewModel.syncState.collectAsState()
+    val notes          by viewModel.notes.collectAsState()
+    val themeMode      by viewModel.themeMode.collectAsState()
+    val workMins       by viewModel.pomodoroWorkMins.collectAsState()
+    val breakMins      by viewModel.pomodoroBreakMins.collectAsState()
     var tokenInput by remember { mutableStateOf("") }
     val syncedCount = notes.count { it.isSynced }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
 
-        Text("Cloud Sync Hub", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Backup notebooks securely to Google Drive.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
+        // ── Appearance ──────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Text("Theme", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (value, label) ->
+                        FilterChip(
+                            selected = themeMode == value,
+                            onClick = { viewModel.setThemeMode(value) },
+                            label = { Text(label) },
+                            leadingIcon = {
+                                Icon(
+                                    when (value) {
+                                        "light" -> Icons.Default.LightMode
+                                        "dark"  -> Icons.Default.DarkMode
+                                        else    -> Icons.Default.BrightnessAuto
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Study Timer ─────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Text("Study Timer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Text("Work session duration", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(15, 20, 25, 30, 45, 60).forEach { mins ->
+                        FilterChip(
+                            selected = workMins == mins,
+                            onClick = { viewModel.setPomodoroWork(mins) },
+                            label = { Text("${mins}m") }
+                        )
+                    }
+                }
+                Text("Break duration", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 15).forEach { mins ->
+                        FilterChip(
+                            selected = breakMins == mins,
+                            onClick = { viewModel.setPomodoroBreak(mins) },
+                            label = { Text("${mins}m") }
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Cloud Sync ──────────────────────────────────────────────────────────
+        Text("Cloud Sync", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             if (maxWidth > 560.dp) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -1637,6 +1823,25 @@ fun SyncHubScreen(viewModel: AppViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
+
+        // ── About ───────────────────────────────────────────────────────────────
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+            Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    modifier = Modifier.size(48.dp).background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.School, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                }
+                Column {
+                    Text("ScholarSpace", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("v3.0 · Student Productivity Suite", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Powered by Gemini AI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -1741,13 +1946,13 @@ private fun SyncStatusCard(syncedCount: Int, total: Int, syncState: SyncState, m
 // ─── Pomodoro Timer ───────────────────────────────────────────────────────────
 
 @Composable
-fun PomodoroTimerCard(modifier: Modifier = Modifier) {
+fun PomodoroTimerCard(workMins: Int = 25, breakMins: Int = 5, modifier: Modifier = Modifier) {
     var ticking   by remember { mutableStateOf(false) }
     var isBreak   by remember { mutableStateOf(false) }
-    var secLeft   by remember { mutableStateOf(25 * 60) }
+    var secLeft   by remember(workMins) { mutableStateOf(workMins * 60) }
     var sessions  by remember { mutableStateOf(0) }
 
-    val totalSecs = if (isBreak) 5 * 60 else 25 * 60
+    val totalSecs = if (isBreak) breakMins * 60 else workMins * 60
     val progress  = secLeft.toFloat() / totalSecs
     val mm = secLeft / 60
     val ss = secLeft % 60
@@ -1764,7 +1969,7 @@ fun PomodoroTimerCard(modifier: Modifier = Modifier) {
         if (ticking && secLeft == 0) {
             if (!isBreak) sessions++
             isBreak = !isBreak
-            secLeft = if (isBreak) 5 * 60 else 25 * 60
+            secLeft = if (isBreak) breakMins * 60 else workMins * 60
         }
     }
 
@@ -1830,7 +2035,7 @@ fun PomodoroTimerCard(modifier: Modifier = Modifier) {
                     }
                     if (secLeft < totalSecs || isBreak) {
                         OutlinedButton(
-                            onClick = { ticking = false; isBreak = false; secLeft = 25 * 60 },
+                            onClick = { ticking = false; isBreak = false; secLeft = workMins * 60 },
                             modifier = Modifier.height(32.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp)
                         ) {
