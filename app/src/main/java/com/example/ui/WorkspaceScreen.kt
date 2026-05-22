@@ -432,7 +432,9 @@ fun ActiveNoteEditor(
     // Undo/redo stacks
     val undoStack = remember { mutableStateListOf<List<com.example.data.DrawingStroke>>() }
     val redoStack = remember { mutableStateListOf<List<com.example.data.DrawingStroke>>() }
-    LaunchedEffect(noteId) { undoStack.clear(); redoStack.clear() }
+    var activePage by remember { mutableStateOf(0) }
+    var pageCount  by remember { mutableStateOf(1) }
+    LaunchedEffect(noteId) { undoStack.clear(); redoStack.clear(); activePage = 0; pageCount = 1 }
 
     // Drawing state
     var drawTool by remember { mutableStateOf(DrawTool.Pen) }
@@ -610,6 +612,13 @@ fun ActiveNoteEditor(
             )
         }
 
+        PageTabsRow(
+            activePage = activePage,
+            pageCount  = pageCount,
+            onPageChange = { activePage = it },
+            onAddPage    = { pageCount++ }
+        )
+
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
         // ── Canvas + text split ────────────────────────────────────────────
@@ -632,6 +641,34 @@ fun ActiveNoteEditor(
                         backgroundStyle = canvasBackground,
                         modifier = Modifier.fillMaxSize()
                     )
+                    // S Pen hint pill
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 14.dp, bottom = 14.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        tonalElevation = 2.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit, null,
+                                modifier = Modifier.size(11.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                "S Pen · Long-press for tools",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                letterSpacing = 0.04.sp
+                            )
+                        }
+                    }
                 }
             },
             textSummarySection = { summaryMod ->
@@ -681,101 +718,106 @@ private fun DrawingToolbar(
         )
     }
 
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-    ) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 1.dp) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Drawing tools
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                DrawToolButton(Icons.Default.Edit,          "Pen",       drawTool == DrawTool.Pen)         { onToolChange(DrawTool.Pen) }
-                DrawToolButton(Icons.Default.Gesture,       "Pencil",    drawTool == DrawTool.Pencil)      { onToolChange(DrawTool.Pencil) }
-                DrawToolButton(Icons.Default.Brush,         "Brush",     drawTool == DrawTool.Brush)       { onToolChange(DrawTool.Brush) }
-                DrawToolButton(Icons.Default.BorderColor,   "Highlight", drawTool == DrawTool.Highlighter) { onToolChange(DrawTool.Highlighter) }
+            // Undo / Redo capsule
+            ToolCapsule {
+                IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.Undo, "Undo",
+                        tint = if (canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
+                        modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onRedo, enabled = canRedo, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.Redo, "Redo",
+                        tint = if (canRedo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
+                        modifier = Modifier.size(18.dp))
+                }
             }
 
-            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            // Drawing tools capsule
+            ToolCapsule {
+                DrawToolChip(Icons.Default.Edit,        drawTool == DrawTool.Pen)         { onToolChange(DrawTool.Pen) }
+                DrawToolChip(Icons.Default.Gesture,     drawTool == DrawTool.Pencil)      { onToolChange(DrawTool.Pencil) }
+                DrawToolChip(Icons.Default.Brush,       drawTool == DrawTool.Brush)       { onToolChange(DrawTool.Brush) }
+                DrawToolChip(Icons.Default.BorderColor, drawTool == DrawTool.Highlighter) { onToolChange(DrawTool.Highlighter) }
+            }
 
-            DrawToolButton(Icons.Default.AutoFixNormal, "Eraser", drawTool == DrawTool.Eraser) { onToolChange(DrawTool.Eraser) }
+            // Eraser capsule
+            ToolCapsule {
+                DrawToolChip(Icons.Default.AutoFixNormal, drawTool == DrawTool.Eraser) { onToolChange(DrawTool.Eraser) }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Undo / Redo
-            IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Undo, "Undo",
-                    tint = if (canUndo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
-                    modifier = Modifier.size(20.dp))
+            // Background style capsule
+            ToolCapsule {
+                listOf("blank" to "—", "ruled" to "≡", "grid" to "#", "dotted" to "⠿").forEach { (style, label) ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(
+                                if (backgroundStyle == style) MaterialTheme.colorScheme.primary
+                                else Color.Transparent
+                            )
+                            .clickable { onBackgroundStyleChange(style) }
+                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = if (backgroundStyle == style) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
-            IconButton(onClick = onRedo, enabled = canRedo, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Redo, "Redo",
-                    tint = if (canRedo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
-                    modifier = Modifier.size(20.dp))
-            }
-
-            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             // Clear canvas
             IconButton(onClick = { showClearDialog = true }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.DeleteSweep, "Clear",
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp))
-            }
-
-            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Background style toggles
-            listOf("blank" to "—", "ruled" to "≡", "grid" to "#", "dotted" to "⠿").forEach { (style, label) ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (backgroundStyle == style) MaterialTheme.colorScheme.primaryContainer
-                            else Color.Transparent
-                        )
-                        .clickable { onBackgroundStyleChange(style) }
-                        .padding(horizontal = 7.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        label, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        color = if (backgroundStyle == style) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                    modifier = Modifier.size(18.dp))
             }
         }
     }
 }
 
 @Composable
-private fun DrawToolButton(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Column(
+private fun ToolCapsule(content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { content() }
+    }
+}
+
+@Composable
+private fun DrawToolChip(icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .size(34.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(21.dp)
-        )
-        Text(
-            text = label,
-            fontSize = 9.sp,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            contentDescription = null,
+            tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -1180,6 +1222,66 @@ private fun AudioLectureBench(
                 }
             }
         }
+    }
+}
+
+// ── 6b. Page tabs ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun PageTabsRow(
+    activePage: Int,
+    pageCount: Int,
+    onPageChange: (Int) -> Unit,
+    onAddPage: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            for (i in 0 until pageCount) {
+                PageTab(label = "Page ${i + 1}", selected = activePage == i, onClick = { onPageChange(i) })
+            }
+            PageTab(label = "+ Add page", selected = false, faint = true, onClick = onAddPage)
+        }
+    }
+}
+
+@Composable
+private fun PageTab(
+    label: String,
+    selected: Boolean,
+    faint: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 0.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = when {
+                selected -> MaterialTheme.colorScheme.primary
+                faint    -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                else     -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(top = 5.dp, bottom = 4.dp)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)
+                )
+        )
     }
 }
 
