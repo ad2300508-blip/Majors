@@ -295,7 +295,7 @@ private fun HeroStatCell(
             .background(MaterialTheme.colorScheme.surface)
             .padding(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.Baseline, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(bigNum, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, fontSize = 28.sp, lineHeight = 28.sp)
             Text(unit, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
